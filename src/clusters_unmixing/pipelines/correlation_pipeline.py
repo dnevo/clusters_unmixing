@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import json
 import random
@@ -44,8 +44,6 @@ def _resolve_output_dir(exp: ExperimentConfig) -> Path:
 
 def _planned_model_runs(exp: ExperimentConfig) -> list[dict[str, Any]]:
     model_eval = exp.model_evaluation
-    if model_eval is None or not model_eval.enabled:
-        return []
     model_params = {model.normalized_name(): dict(model.params) for model in model_eval.models}
     runs = []
     for item in model_eval.runs:
@@ -128,7 +126,7 @@ def run_correlation_experiments(config_path: str | Path) -> dict[str, Any]:
             'output_dir': str(output_dir),
             'summary_path': str(summary_path),
             'n_runs': 0,
-            'model_evaluation': {'enabled': False, 'n_runs': 0},
+            'model_evaluation': {'n_runs': 0},
         }
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -235,11 +233,11 @@ def run_correlation_experiments(config_path: str | Path) -> dict[str, Any]:
         'summary_path': str(summary_path),
         'n_runs': len(runs),
         'model_evaluation': {
-            'enabled': True,
             'n_runs': len(runs),
             'summary_path': str(model_summary_path),
             'abundance_preview_path': str(abundance_preview_path),
             'spectra_preview_path': str(spectra_preview_path),
         },
     }
+
 

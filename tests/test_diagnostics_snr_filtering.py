@@ -1,4 +1,4 @@
-﻿from pathlib import Path
+from pathlib import Path
 
 import pandas as pd
 
@@ -16,7 +16,6 @@ def test_build_model_run_comparisons_filters_by_snr(tmp_path: Path) -> None:
 {
   "cluster_sets": [{"name": "set_a", "path": "data/6clusters_thomas.csv"}],
   "model_evaluation": {
-    "enabled": true,
     "models": [{"name": "sunsal", "params": {}}],
     "runs": [
       {
@@ -102,4 +101,5 @@ def test_model_run_config_requires_num_pixels_and_snr_db() -> None:
         assert "snr_db" in message
     else:
         raise AssertionError("Expected ValidationError for missing snr_db")
+
 

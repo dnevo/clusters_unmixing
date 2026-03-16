@@ -1,4 +1,4 @@
-﻿from pathlib import Path
+from pathlib import Path
 import sys
 
 import pytest
@@ -89,14 +89,14 @@ def test_run_correlation_experiments_notebook_flow(monkeypatch: pytest.MonkeyPat
         print()
 
     assert result["n_runs"] > 0
-    assert result["model_evaluation"]["enabled"] is True
+    assert result["model_evaluation"]["n_runs"] > 0
     assert len(run_diagnostics) > 0
 
 
 def test_run_correlation_experiments_requires_model_runs(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """No model-evaluation runs should return a disabled stage result."""
+    """No model-evaluation runs should return an empty model-evaluation result."""
 
     class _FakeExperiment:
         run_name = "unit_test_run"
@@ -114,5 +114,6 @@ def test_run_correlation_experiments_requires_model_runs(
     monkeypatch.setattr(pipeline, "_planned_model_runs", lambda _exp: [])
 
     result = pipeline.run_correlation_experiments("dummy_config.json")
-    assert result["model_evaluation"]["enabled"] is False
     assert result["model_evaluation"]["n_runs"] == 0
+
+

@@ -15,8 +15,6 @@ metrics:
   - sam
 
 model_evaluation:
-
-  enabled: true                 # run unmixing experiments
   output_subdir: model_evaluation
 
   # models registered in models/runner_registry.py

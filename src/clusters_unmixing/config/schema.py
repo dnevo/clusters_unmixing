@@ -199,15 +199,12 @@ class ModelRunConfig(BaseModel):
 
 class ModelEvaluationConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    enabled: bool = False
     output_subdir: str = "model_evaluation"
     models: list[ModelSpecConfig] = Field(default_factory=list)
     runs: list[ModelRunConfig] = Field(default_factory=list)
 
     @classmethod
     def from_dict(cls, raw: dict[str, Any]) -> "ModelEvaluationConfig":
-        if raw is None:
-            return cls()
         models = [ModelSpecConfig.from_raw(item) for item in raw.get("models", [])]
         runs = [ModelRunConfig.from_dict(item) for item in raw.get("runs", [])]
         payload = dict(raw)
@@ -223,15 +220,14 @@ class ExperimentConfig(BaseModel):
     output_dir: str = "experiments/outputs"
     cluster_sets: list[ClusterSetConfig]
     metrics: list[str] = Field(default_factory=lambda: ["cosine", "sam"])
-    model_evaluation: ModelEvaluationConfig | None = None
+    model_evaluation: ModelEvaluationConfig
     config_dir: str | None = None
 
     @classmethod
     def from_dict(cls, raw: dict[str, Any], config_dir: str | None = None) -> "ExperimentConfig":
         payload = dict(raw)
         payload["cluster_sets"] = [ClusterSetConfig.model_validate(item) for item in raw["cluster_sets"]]
-        if isinstance(raw.get("model_evaluation"), dict):
-            payload["model_evaluation"] = ModelEvaluationConfig.from_dict(raw["model_evaluation"])
+        payload["model_evaluation"] = ModelEvaluationConfig.from_dict(raw["model_evaluation"])
         payload["config_dir"] = config_dir
         return cls.model_validate(payload)
 
@@ -250,3 +246,4 @@ class ExperimentConfig(BaseModel):
                 config_dir = candidate
                 break
         return cls.from_dict(raw, config_dir=str(config_dir))
+
