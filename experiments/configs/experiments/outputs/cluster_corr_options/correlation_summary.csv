@@ -1,0 +1,5 @@
+run_index,cluster_set,bands_ranges,normalization,transform,metric,mean_abs_offdiag,max_abs_offdiag,min_offdiag,max_offdiag
+1,6clusters_thomas,"[[0.4,2.4025]]",without,first_derivative,cosine,0.904261777340322,0.978196214136722,0.7641149368817843,0.978196214136722
+1,6clusters_thomas,"[[0.4,2.4025]]",without,first_derivative,sam,24.018029391424918,40.17168297416819,11.986595864376868,40.17168297416819
+2,6clusters_thomas,"[[0.4,2.4025]]",with_quadratic,first_derivative,cosine,0.8588793090560102,0.9683928016077227,0.6594344259438558,0.9683928016077227
+2,6clusters_thomas,"[[0.4,2.4025]]",with_quadratic,first_derivative,sam,29.329330838356665,48.74324684628905,14.443791843654783,48.74324684628905

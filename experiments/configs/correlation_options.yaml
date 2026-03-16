@@ -1,0 +1,67 @@
+run_name: cluster_corr_options
+output_dir: experiments/outputs
+
+cluster_sets:
+
+  - name: 6clusters_thomas
+    path: data/6clusters_thomas.csv
+
+  - name: 6clusters_digitized
+    path: data/6clusters_digitized.csv
+
+# Metrics implemented in metrics/correlation.py
+metrics:
+  - cosine
+  - sam
+
+model_evaluation:
+
+  enabled: true                 # run unmixing experiments
+  output_subdir: model_evaluation
+
+  # models registered in models/runner_registry.py
+  models:
+
+    - name: sunsal
+      params:
+        mu: 0.001
+        lambda_reg: 0.0
+        max_iters: 300
+        tol: 1.0e-6
+        check_every: 10
+        verbose: false
+
+    - name: vpgdu
+      params:
+        initial_estimator_num_samples: 500
+        threshold: 1.0e-6
+        max_iters: 500
+        t: 10
+        verbose: false
+
+  runs:
+
+    - cluster_set: 6clusters_thomas
+
+      bands_ranges:
+
+        - range_µm: [0.5, 0.8]
+          reduce: none          # options: none | mean
+
+        - range_µm: [1.2, 1.6]
+          reduce: mean
+
+        - range_µm: [2.0, 2.5]
+          reduce: none
+
+      normalization: with_quadratic   # options: without | with_quadratic
+      transform: raw    # options: raw | first_derivative
+      num_pixels: 512 # number of synthetic pixels generated
+
+
+      # signal-to-noise ratio
+      snr_db: inf # number (e.g 30.0) or inf (for no noise)
+
+      models:
+        - sunsal
+        - vpgdu

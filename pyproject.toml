@@ -1,0 +1,21 @@
+﻿[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "clusters_unmixing"
+version = "0.2.0"
+description = "Lean spectral unmixing experiment framework"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "numpy",
+  "pandas",
+  "pydantic>=2",
+  "pyyaml",
+  "torch",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
