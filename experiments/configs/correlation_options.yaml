@@ -53,7 +53,25 @@ model_evaluation:
           reduce: none
 
       normalization: with_quadratic   # options: without | with_quadratic
-      transform: raw    # options: raw | first_derivative
+      transform:
+        steps: []   # no transform
+      # first_derivative only:
+      # transform:
+      #   steps:
+      #     - name: first_derivative
+      # PCA only:
+      # transform:
+      #   steps:
+      #     - name: pca
+      #       params:
+      #         n_components: 10
+      # first_derivative + PCA:
+      # transform:
+      #   steps:
+      #     - name: first_derivative
+      #     - name: pca
+      #       params:
+      #         n_components: 10
       num_pixels: 512 # number of synthetic pixels generated
 
 
@@ -63,3 +81,4 @@ model_evaluation:
       models:
         - sunsal
         - vpgdu
+

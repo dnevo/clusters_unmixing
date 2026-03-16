@@ -105,3 +105,31 @@ def test_apply_transform_pca_requires_integer_n_components() -> None:
     with pytest.raises(ValueError, match="n_components"):
         apply_transform(signatures, kind="pca", params={"n_components": 1.0})
 
+
+
+def test_model_run_config_supports_empty_transform_steps_as_raw() -> None:
+    payload = {
+        **_base_run_payload(),
+        "transform": {"steps": []},
+    }
+
+    run_cfg = ModelRunConfig.from_dict(payload)
+
+    assert run_cfg.normalized_transform_steps() == []
+    assert run_cfg.normalized_transform() == "raw"
+
+
+def test_model_run_config_supports_first_derivative_in_steps() -> None:
+    payload = {
+        **_base_run_payload(),
+        "transform": {
+            "steps": [
+                {"name": "first_derivative"},
+            ]
+        },
+    }
+
+    run_cfg = ModelRunConfig.from_dict(payload)
+
+    assert run_cfg.normalized_transform_steps() == [("first_derivative", {})]
+    assert run_cfg.normalized_transform() == "first_derivative"

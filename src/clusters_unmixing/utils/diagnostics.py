@@ -3,12 +3,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from typing import Any
-
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 from IPython.display import Markdown, display
-
 from clusters_unmixing.config import ExperimentConfig
 
 
@@ -20,8 +18,6 @@ def build_model_run_comparisons(config_path: str | Path, model_summary_path: str
     config = ExperimentConfig.from_json_file(config_path)
     summary_df = pd.read_csv(model_summary_path)
     model_eval = config.model_evaluation
-    if model_eval is None:
-        return []
     runs = list(model_eval.runs)
     payloads = []
     for run_index, run in enumerate(runs, start=1):
@@ -54,8 +50,6 @@ def build_model_run_diagnostics(config_path: str | Path, correlation_summary_pat
     abundance_df = pd.read_csv(abundance_preview_path) if abundance_preview_path and Path(abundance_preview_path).exists() and Path(abundance_preview_path).stat().st_size else pd.DataFrame()
     spectra_df = pd.read_csv(spectra_preview_path) if spectra_preview_path and Path(spectra_preview_path).exists() and Path(spectra_preview_path).stat().st_size else pd.DataFrame()
     model_eval = config.model_evaluation
-    if model_eval is None:
-        return []
     runs = list(model_eval.runs)
     payloads = []
     for run_index, run in enumerate(runs, start=1):
@@ -94,14 +88,9 @@ def build_model_run_diagnostics(config_path: str | Path, correlation_summary_pat
     return payloads
 
 
-
-
-
-
 def display_projection_reflectance(groups: list[dict[str, Any]]) -> None:
     for group in groups:
-        if group.get('metric_rows'):
-            display(pd.DataFrame(group['metric_rows']))
+        display(pd.DataFrame(group['metric_rows']))
 
 
 def _resolve_abundance_columns(abundance_df: pd.DataFrame) -> tuple[list[str], list[str]]:
@@ -109,19 +98,11 @@ def _resolve_abundance_columns(abundance_df: pd.DataFrame) -> tuple[list[str], l
     pred_cols = [c for c in abundance_df.columns if c.startswith('est_a') or c.startswith('pred_abundance_')]
     true_cols = sorted(true_cols, key=lambda c: int(''.join(ch for ch in c if ch.isdigit()) or 0))
     pred_cols = sorted(pred_cols, key=lambda c: int(''.join(ch for ch in c if ch.isdigit()) or 0))
-    if not true_cols or not pred_cols:
-        return [], []
-    if len(true_cols) != len(pred_cols):
-        raise ValueError(f'Mismatched abundance columns: {len(true_cols)} true vs {len(pred_cols)} predicted')
     return true_cols, pred_cols
 
 
 def build_abundance_comparison_tables(abundance_df: pd.DataFrame, max_pixels: int = 5) -> list[dict[str, Any]]:
-    if abundance_df is None or abundance_df.empty:
-        return []
     true_cols, pred_cols = _resolve_abundance_columns(abundance_df)
-    if not true_cols or not pred_cols:
-        return []
 
     pixel_ids = sorted(int(v) for v in abundance_df['pixel_index'].dropna().unique())[:max_pixels]
     tables: list[dict[str, Any]] = []
@@ -154,9 +135,6 @@ def build_abundance_comparison_tables(abundance_df: pd.DataFrame, max_pixels: in
 
 def display_abundance_comparison_tables(abundance_df: pd.DataFrame, max_pixels: int = 5) -> None:
     tables = build_abundance_comparison_tables(abundance_df=abundance_df, max_pixels=max_pixels)
-    if not tables:
-        display(Markdown('No abundance preview rows found for this run.'))
-        return
     for item in tables:
         display(Markdown(f"### Abundances  |  pixel_index={item['pixel_index']}"))
         display(item['table'])
@@ -172,13 +150,6 @@ def display_spectra_preview_plots(spectra_preview: pd.DataFrame | None, models: 
     for _, row in spectra_preview.head(3).iterrows():
         fig.add_trace(go.Scatter(y=[row[col] for col in band_cols], mode='lines', name=str(row.get('model', 'sample'))))
     return fig
-
-
-
-
-
-
-
 
 
 def plot_cluster_overview(
@@ -307,4 +278,3 @@ def plot_cluster_overview(
         height=480,
     )
     return fig
-

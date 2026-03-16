@@ -22,7 +22,7 @@ def test_build_model_run_comparisons_filters_by_snr(tmp_path: Path) -> None:
         "cluster_set": "set_a",
         "bands_ranges": [[0.4, 2.4025]],
         "normalization": "without",
-        "transform": "raw",
+        "transform": {"steps": []},
         "num_pixels": 16,
         "snr_db": 10.0,
         "models": ["sunsal"]
@@ -31,7 +31,7 @@ def test_build_model_run_comparisons_filters_by_snr(tmp_path: Path) -> None:
         "cluster_set": "set_a",
         "bands_ranges": [[0.4, 2.4025]],
         "normalization": "without",
-        "transform": "raw",
+        "transform": {"steps": []},
         "num_pixels": 16,
         "snr_db": 30.0,
         "models": ["sunsal"]
@@ -49,7 +49,7 @@ def test_build_model_run_comparisons_filters_by_snr(tmp_path: Path) -> None:
                 "cluster_set": "set_a",
                 "bands_ranges": "[[0.4,2.4025]]",
                 "normalization": "without",
-                "transform": "raw",
+                "transform": {"steps": []},
                 "snr_db": 10.0,
                 "model": "sunsal",
                 "metric": "abundance_rmse",
@@ -59,7 +59,7 @@ def test_build_model_run_comparisons_filters_by_snr(tmp_path: Path) -> None:
                 "cluster_set": "set_a",
                 "bands_ranges": "[[0.4,2.4025]]",
                 "normalization": "without",
-                "transform": "raw",
+                "transform": {"steps": []},
                 "snr_db": 30.0,
                 "model": "sunsal",
                 "metric": "abundance_rmse",
@@ -92,7 +92,7 @@ def test_model_run_config_requires_num_pixels_and_snr_db() -> None:
             "cluster_set": "set_a",
             "bands_ranges": [[0.4, 2.4025]],
             "normalization": "without",
-            "transform": "raw",
+            "transform": {"steps": []},
             "models": ["sunsal"],
         })
     except ValidationError as exc:

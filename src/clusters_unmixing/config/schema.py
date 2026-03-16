@@ -95,7 +95,7 @@ class ModelRunConfig(BaseModel):
     cluster_set: str
     bands_ranges: list[Any]
     normalization: str = "without"
-    transform: Any = "raw"
+    transform: Any = Field(default_factory=lambda: {"steps": []})
     models: list[str]
     num_pixels: int
     snr_db: float
@@ -147,15 +147,8 @@ class ModelRunConfig(BaseModel):
 
     def normalized_transform_steps(self) -> list[TransformStepSpec]:
         raw = self.transform
-        if isinstance(raw, str):
-            value = raw.strip().lower()
-            if value == "raw":
-                return []
-            if value == "first_derivative":
-                return [("first_derivative", {})]
-            raise ValueError("Model run 'transform' must be 'raw', 'first_derivative', or {'steps': [...]} ")
         if not isinstance(raw, dict) or "steps" not in raw or not isinstance(raw["steps"], list):
-            raise ValueError("Model run 'transform' must be a string or object with a 'steps' list")
+            raise ValueError("Model run 'transform' must be an object with a 'steps' list")
         steps = [TransformStepModel.model_validate(step).to_spec() for step in raw["steps"]]
         names = [name for name, _ in steps]
         if names.count("first_derivative") > 1:
