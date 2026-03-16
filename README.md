@@ -2,6 +2,8 @@
 
 A slimmed-down spectral unmixing experiment framework.
 
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/dnevo/clusters_unmixing/blob/main/notebooks/00_cluster_diagnostics.ipynb)
+
 Core modules:
 - `config/schema.py`: validated config models
 - `dataio/clusters.py`: CSV loading
