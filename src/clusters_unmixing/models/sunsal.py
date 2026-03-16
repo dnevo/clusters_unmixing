@@ -220,62 +220,13 @@ class SunSAL:
 
         return x.T.contiguous()
 
-    @staticmethod
-    def _apply_transform_endmembers(endmembers: torch.Tensor, transform: str) -> torch.Tensor:
-        """Apply selected spectral transform to endmember signatures.
-
-        Parameters
-        ----------
-        endmembers : torch.Tensor
-            Endmember matrix.
-        transform : str
-            Transform mode name.
-
-        Returns
-        -------
-        torch.Tensor
-            Transformed endmember matrix.
-        """
-
-        transform = transform.strip().lower()
-        if transform == "raw":
-            return endmembers
-        if transform == "first_derivative":
-            return torch.gradient(endmembers, dim=0)[0]
-        raise ValueError(f"Unsupported transform mode: {transform}")
-
-    @staticmethod
-    def _apply_transform_pixels(pixels: torch.Tensor, transform: str) -> torch.Tensor:
-        """Apply selected spectral transform to pixel observations.
-
-        Parameters
-        ----------
-        pixels : torch.Tensor
-            Pixel matrix.
-        transform : str
-            Transform mode name.
-
-        Returns
-        -------
-        torch.Tensor
-            Transformed pixel matrix.
-        """
-
-        transform = transform.strip().lower()
-        if transform == "raw":
-            return pixels
-        if transform == "first_derivative":
-            return torch.gradient(pixels, dim=1)[0]
-        raise ValueError(f"Unsupported transform mode: {transform}")
-
     def solve(
         self,
         endmembers: torch.Tensor,
         pixels: torch.Tensor,
         x0: Optional[torch.Tensor] = None,
-        transform: str = "raw",
     ) -> torch.Tensor:
-        """Solve abundances for pixels under selected transform.
+        """Solve abundances for pixels.
 
         Parameters
         ----------
@@ -287,8 +238,6 @@ class SunSAL:
             Pixel matrix with shape ``(n_pixels, n_bands)``.
         x0 : Optional[torch.Tensor], optional
             Optional initial abundance estimate.
-        transform : str, optional
-            Transform mode to apply before optimization.
 
         Returns
         -------
@@ -296,6 +245,4 @@ class SunSAL:
             Estimated abundances with shape ``(n_pixels, n_endmembers)``.
         """
 
-        transformed_endmembers = self._apply_transform_endmembers(endmembers, transform)
-        transformed_pixels = self._apply_transform_pixels(pixels, transform)
-        return self._solve_core(transformed_endmembers, transformed_pixels, x0=x0)
+        return self._solve_core(endmembers, pixels, x0=x0)

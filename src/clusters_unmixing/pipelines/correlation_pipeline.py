@@ -180,7 +180,6 @@ def run_correlation_experiments(config_path: str | Path) -> dict[str, Any]:
                 model_name=model_spec['name'],
                 endmembers=endmembers_t,
                 pixels=pixels_t,
-                transform=run['transform'],
                 params=model_spec['params'],
             )
             abundances = abundances_t.detach().cpu().numpy()
@@ -239,5 +238,6 @@ def run_correlation_experiments(config_path: str | Path) -> dict[str, Any]:
             'spectra_preview_path': str(spectra_preview_path),
         },
     }
+
 
 

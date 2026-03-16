@@ -285,55 +285,7 @@ class VPGDU:
 
         return abundance_hat.T
 
-    @staticmethod
-    def _apply_transform_endmembers(endmembers: torch.Tensor, transform: str) -> torch.Tensor:
-        """Apply selected spectral transform to endmember signatures.
-
-        Parameters
-        ----------
-        endmembers : torch.Tensor
-            Endmember matrix.
-        transform : str
-            Transform mode name.
-
-        Returns
-        -------
-        torch.Tensor
-            Transformed endmember matrix.
-        """
-
-        transform = transform.strip().lower()
-        if transform == "raw":
-            return endmembers
-        if transform == "first_derivative":
-            return torch.gradient(endmembers, dim=0)[0]
-        raise ValueError(f"Unsupported transform mode: {transform}")
-
-    @staticmethod
-    def _apply_transform_pixels(pixels: torch.Tensor, transform: str) -> torch.Tensor:
-        """Apply selected spectral transform to pixel observations.
-
-        Parameters
-        ----------
-        pixels : torch.Tensor
-            Pixel matrix.
-        transform : str
-            Transform mode name.
-
-        Returns
-        -------
-        torch.Tensor
-            Transformed pixel matrix.
-        """
-
-        transform = transform.strip().lower()
-        if transform == "raw":
-            return pixels
-        if transform == "first_derivative":
-            return torch.gradient(pixels, dim=1)[0]
-        raise ValueError(f"Unsupported transform mode: {transform}")
-
-    def solve(self, endmembers: torch.Tensor, pixels: torch.Tensor, transform: str = "raw") -> torch.Tensor:
+    def solve(self, endmembers: torch.Tensor, pixels: torch.Tensor) -> torch.Tensor:
         """Solve abundances for pixels given endmembers under selected transform.
 
         Parameters
@@ -344,8 +296,6 @@ class VPGDU:
             Endmember matrix with shape ``(n_bands, n_endmembers)``.
         pixels : torch.Tensor
             Pixel matrix with shape ``(n_pixels, n_bands)``.
-        transform : str, optional
-            Transform mode applied before optimization.
 
         Returns
         -------
@@ -353,6 +303,4 @@ class VPGDU:
             Estimated abundances with shape ``(n_pixels, n_endmembers)``.
         """
 
-        transformed_endmembers = self._apply_transform_endmembers(endmembers, transform=transform)
-        transformed_pixels = self._apply_transform_pixels(pixels, transform=transform)
-        return self._solve_core(transformed_endmembers, transformed_pixels)
+        return self._solve_core(endmembers, pixels)

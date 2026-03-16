@@ -54,7 +54,10 @@ model_evaluation:
 
       normalization: with_quadratic   # options: without | with_quadratic
       transform:
-        steps: []   # no transform
+        steps:   # no transform
+          - name: pca
+            params:
+              n_components: 5
       # first_derivative only:
       # transform:
       #   steps:
@@ -64,14 +67,14 @@ model_evaluation:
       #   steps:
       #     - name: pca
       #       params:
-      #         n_components: 10
+      #         n_components: 5
       # first_derivative + PCA:
       # transform:
       #   steps:
       #     - name: first_derivative
       #     - name: pca
       #       params:
-      #         n_components: 10
+      #         n_components: 5
       num_pixels: 512 # number of synthetic pixels generated
 
 

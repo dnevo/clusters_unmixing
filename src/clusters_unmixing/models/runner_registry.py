@@ -7,24 +7,24 @@ import torch
 from .sunsal import SunSAL, SunSALConfig
 from .vpgdu import VPGDU, VPGDUConfig
 
-ModelRunner = Callable[[torch.Tensor, torch.Tensor, str, dict[str, Any]], tuple[torch.Tensor, dict[str, Any]]]
+ModelRunner = Callable[[torch.Tensor, torch.Tensor, dict[str, Any]], tuple[torch.Tensor, dict[str, Any]]]
 
 
-def _run_sunsal(endmembers: torch.Tensor, pixels: torch.Tensor, transform: str, params: dict[str, Any]) -> tuple[torch.Tensor, dict[str, Any]]:
+def _run_sunsal(endmembers: torch.Tensor, pixels: torch.Tensor, params: dict[str, Any]) -> tuple[torch.Tensor, dict[str, Any]]:
     config_params = dict(params)
     if "μ" in config_params and "mu" not in config_params:
         config_params["mu"] = config_params.pop("μ")
     if "λ_reg" in config_params and "lambda_reg" not in config_params:
         config_params["lambda_reg"] = config_params.pop("λ_reg")
     solver = SunSAL(SunSALConfig(**config_params))
-    abundances = solver.solve(endmembers, pixels, transform=transform)
+    abundances = solver.solve(endmembers, pixels)
     history = getattr(solver, "history", {}) or {}
     return abundances, {"iterations_logged": int((history.get("iters") or [0])[-1] if history.get("iters") else 0), "last_active_pixels": int(pixels.shape[0])}
 
 
-def _run_vpgdu(endmembers: torch.Tensor, pixels: torch.Tensor, transform: str, params: dict[str, Any]) -> tuple[torch.Tensor, dict[str, Any]]:
+def _run_vpgdu(endmembers: torch.Tensor, pixels: torch.Tensor, params: dict[str, Any]) -> tuple[torch.Tensor, dict[str, Any]]:
     solver = VPGDU(VPGDUConfig(**params))
-    abundances = solver.solve(endmembers, pixels, transform=transform)
+    abundances = solver.solve(endmembers, pixels)
     history = getattr(solver, "history", {}) or {}
     active = history.get("active_pixels") or [pixels.shape[0]]
     iterations = history.get("iterations") or []
@@ -45,8 +45,8 @@ def available_models() -> list[str]:
     return sorted(_MODEL_REGISTRY)
 
 
-def run_registered_model(model_name: str, endmembers: torch.Tensor, pixels: torch.Tensor, transform: str, params: dict[str, Any] | None = None) -> tuple[torch.Tensor, dict[str, Any]]:
+def run_registered_model(model_name: str, endmembers: torch.Tensor, pixels: torch.Tensor, params: dict[str, Any] | None = None) -> tuple[torch.Tensor, dict[str, Any]]:
     key = model_name.strip().lower()
     if key not in _MODEL_REGISTRY:
         raise ValueError(f"Unsupported model '{model_name}'. Available models: {available_models()}")
-    return _MODEL_REGISTRY[key](endmembers, pixels, transform, {} if params is None else dict(params))
+    return _MODEL_REGISTRY[key](endmembers, pixels, {} if params is None else dict(params))

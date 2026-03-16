@@ -66,3 +66,5 @@ def select_wavelength_ranges(wavelengths: np.ndarray, signatures: np.ndarray, ba
             pieces_s.append(s)
             segment_lengths.append(int(w.shape[0]))
     return np.concatenate(pieces_w), np.vstack(pieces_s), segment_lengths
+
+
