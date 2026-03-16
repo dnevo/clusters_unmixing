@@ -17,13 +17,6 @@ def generate_samples(num_samples: int, max_non_zero_endmembers: int, num_endmemb
     Randomness is intentionally driven by Python's ``random`` module so callers can
     reproduce the legacy results by resetting ``random.seed(...)`` before calling.
     """
-    if num_samples <= 0:
-        raise ValueError("num_samples must be > 0")
-    if num_endmembers <= 0:
-        raise ValueError("num_endmembers must be > 0")
-    if max_non_zero_endmembers <= 0:
-        raise ValueError("max_non_zero_endmembers must be > 0")
-
     generated_samples: list[torch.Tensor] = []
 
     for i in range(num_endmembers):

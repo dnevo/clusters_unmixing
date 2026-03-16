@@ -10,13 +10,9 @@ def first_derivative(signatures: np.ndarray) -> np.ndarray:
 
 
 def pca_reduce(signatures: np.ndarray, n_components: int) -> np.ndarray:
-    if isinstance(n_components, bool) or not isinstance(n_components, int):
-        raise ValueError("PCA 'n_components' must be an integer")
-    if n_components <= 0:
-        raise ValueError("PCA 'n_components' must be > 0")
-    n_bands, _ = signatures.shape
-    if n_components > n_bands:
-        raise ValueError("PCA 'n_components' cannot exceed number of bands")
+    n_bands, n_members = signatures.shape
+    if n_components > n_members:
+        raise ValueError("PCA 'n_components' cannot exceed number of endmembers")
     centered = signatures - signatures.mean(axis=1, keepdims=True)
     u, s, _ = np.linalg.svd(centered, full_matrices=False)
     basis = u[:, :n_components]
