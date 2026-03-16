@@ -21,6 +21,4 @@ def load_wavelength_and_cluster_matrix(csv_path: str | PathLike[str]) -> tuple[n
     return wavelengths, clusters
 
 
-def load_cluster_matrix(csv_path: str | PathLike[str]) -> np.ndarray:
-    _, clusters = load_wavelength_and_cluster_matrix(csv_path)
-    return clusters
+

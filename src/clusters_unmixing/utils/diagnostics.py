@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import json
 from pathlib import Path
@@ -94,12 +94,8 @@ def build_model_run_diagnostics(config_path: str | Path, correlation_summary_pat
     return payloads
 
 
-def build_projection_outputs(*args: Any, **kwargs: Any) -> list[dict[str, Any]]:
-    return []
 
 
-def build_combination_outputs(*args: Any, **kwargs: Any) -> list[dict[str, Any]]:
-    return []
 
 
 def display_projection_reflectance(groups: list[dict[str, Any]]) -> None:
@@ -178,20 +174,12 @@ def display_spectra_preview_plots(spectra_preview: pd.DataFrame | None, models: 
     return fig
 
 
-def display_model_run_comparisons(*args: Any, **kwargs: Any) -> None:
-    return None
 
 
-def display_projection_outputs(*args: Any, **kwargs: Any) -> None:
-    return None
 
 
-def display_reflectance_outputs(*args: Any, **kwargs: Any) -> None:
-    return None
 
 
-def display_combination_outputs(*args: Any, **kwargs: Any) -> None:
-    return None
 
 def plot_cluster_overview(
     wavelengths: Any,
@@ -222,9 +210,9 @@ def plot_cluster_overview(
         normalized: list[tuple[float, float, str]] = []
         for item in raw_ranges:
             if isinstance(item, dict):
-                range_vals = item.get("range_Âµm") or item.get("range_um")
+                range_vals = item.get("range_µm") or item.get("range_um")
                 if range_vals is None or len(range_vals) != 2:
-                    raise ValueError("bands_ranges object entries must contain range_Âµm=[x_min, x_max]")
+                    raise ValueError("bands_ranges object entries must contain range_µm=[x_min, x_max]")
                 reduce = str(item.get("reduce", "none")).strip().lower()
                 normalized.append((float(range_vals[0]), float(range_vals[1]), reduce))
             elif isinstance(item, (list, tuple)) and len(item) == 3:
@@ -282,7 +270,7 @@ def plot_cluster_overview(
                     legendgroup=cluster_name,
                     showlegend=not legend_shown,
                     line={"color": cluster_color, "dash": dash_style},
-                    hovertemplate="cluster=%{fullData.name}<br>wavelength=%{x:.3f} Âµm<br>value=%{y:.4f}<extra></extra>",
+                    hovertemplate="cluster=%{fullData.name}<br>wavelength=%{x:.3f} µm<br>value=%{y:.4f}<extra></extra>",
                 ))
                 legend_shown = True
 
@@ -297,7 +285,7 @@ def plot_cluster_overview(
                         name=cluster_name,
                         legendgroup=cluster_name,
                         showlegend=False,
-                        hovertemplate="cluster=%{fullData.name}<br>wavelength=%{x:.3f} Âµm<br>value=%{y:.4f}<extra></extra>",
+                        hovertemplate="cluster=%{fullData.name}<br>wavelength=%{x:.3f} µm<br>value=%{y:.4f}<extra></extra>",
                     ))
 
         if not legend_shown:
@@ -309,13 +297,14 @@ def plot_cluster_overview(
                 legendgroup=cluster_name,
                 showlegend=True,
                 line={"color": cluster_color},
-                hovertemplate="cluster=%{fullData.name}<br>wavelength=%{x:.3f} Âµm<br>value=%{y:.4f}<extra></extra>",
+                hovertemplate="cluster=%{fullData.name}<br>wavelength=%{x:.3f} µm<br>value=%{y:.4f}<extra></extra>",
             ))
 
     fig.update_layout(
         title=title,
-        xaxis_title="Wavelength (Âµm)",
+        xaxis_title="Wavelength (µm)",
         yaxis_title=y_title,
         height=480,
     )
     return fig
+

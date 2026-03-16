@@ -39,14 +39,10 @@ def configure_notebook(project_root: str | Path | None = None, autoreload: bool 
     return resolved_root
 
 
-def default_config_path(project_root: str | Path | None = None, prefer_yaml: bool = True) -> Path:
+def default_config_path(project_root: str | Path | None = None) -> Path:
     root = configure_notebook(project_root=project_root, autoreload=False)
-    configs_dir = root / 'experiments' / 'configs'
-    if prefer_yaml:
-        yaml_path = configs_dir / 'correlation_options.yaml'
-        if yaml_path.exists():
-            return yaml_path
-    return configs_dir / 'correlation_options.json'
+    return root / 'experiments' / 'configs' / 'correlation_options.yaml'
+
 
 
 def _bands_key(raw_bands_ranges: list[Any]) -> str:
@@ -84,15 +80,11 @@ def stats_table(rows: dict[str, dict[str, float]]) -> pd.DataFrame:
 
 
 def format_model_metrics_table(model_df: pd.DataFrame) -> pd.DataFrame:
-    if model_df.empty:
-        return pd.DataFrame()
     pivot = model_df.pivot_table(index='metric', columns='model', values='mean', aggfunc='first')
     return pivot.sort_index().round(6)
 
 
 def abundance_error_table(abundance_df: pd.DataFrame) -> pd.DataFrame:
-    if abundance_df.empty:
-        return abundance_df
     rows = []
     true_cols = sorted([c for c in abundance_df.columns if str(c).startswith('true_a')])
     pred_cols = sorted([c for c in abundance_df.columns if str(c).startswith('est_a')])
@@ -172,9 +164,6 @@ def run_diagnostics_notebook(config_path: str | Path | None = None, project_root
     display(model_df.round(6))
 
     model_eval = config.model_evaluation
-    if model_eval is None or not model_eval.runs:
-        raise ValueError('No model_evaluation.runs found in config')
-
     for run_index, run_cfg in enumerate(model_eval.runs, start=1):
         display(Markdown(f'---\n## Run {run_index}/{len(model_eval.runs)}'))
 
@@ -258,9 +247,8 @@ def run_diagnostics_notebook(config_path: str | Path | None = None, project_root
         ].copy()
         display(Markdown('### Abundance comparison by sampled pixel'))
         display_abundance_comparison_tables(abundance_rows, max_pixels=5)
-        if not abundance_rows.empty:
-            display(Markdown('### Abundance error summary'))
-            display(abundance_error_table(abundance_rows))
+        display(Markdown('### Abundance error summary'))
+        display(abundance_error_table(abundance_rows))
 
         spectra_rows = spectra_df[
             (spectra_df['cluster_set'] == cluster_set)
@@ -270,18 +258,15 @@ def run_diagnostics_notebook(config_path: str | Path | None = None, project_root
             & (spectra_df['snr_db'].astype(float) == float(snr_db))
         ].copy()
         display(Markdown('### Synthetic pixel spectra preview'))
-        if abundance_rows.empty:
-            display(Markdown('No abundance preview rows found for this run.'))
-        else:
-            endmembers_full_for_plot = apply_normalization(signatures_full, wavelengths_full, normalization)
-            for pixel_index in sorted(abundance_rows['pixel_index'].astype(int).unique()):
-                display(plot_pixel_preview(
-                    pixel_index=pixel_index,
-                    wavelengths_full=wavelengths_full,
-                    endmembers_full=endmembers_full_for_plot,
-                    abundance_rows=abundance_rows,
-                    spectra_rows=spectra_rows,
-                ))
+        endmembers_full_for_plot = apply_normalization(signatures_full, wavelengths_full, normalization)
+        for pixel_index in sorted(abundance_rows['pixel_index'].astype(int).unique()):
+            display(plot_pixel_preview(
+                pixel_index=pixel_index,
+                wavelengths_full=wavelengths_full,
+                endmembers_full=endmembers_full_for_plot,
+                abundance_rows=abundance_rows,
+                spectra_rows=spectra_rows,
+            ))
 
     return {
         'result': result,
@@ -290,4 +275,3 @@ def run_diagnostics_notebook(config_path: str | Path | None = None, project_root
         'abundance_df': abundance_df,
         'spectra_df': spectra_df,
     }
-
