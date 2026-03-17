@@ -8,7 +8,6 @@ from .diagnostics import (
 from .notebook_diagnostics import (
     abundance_error_table,
     configure_notebook,
-    default_config_path,
     run_diagnostics_notebook,
 )
 
@@ -19,7 +18,6 @@ __all__ = [
     'display_spectra_preview_plots',
     'plot_cluster_overview',
     'configure_notebook',
-    'default_config_path',
     'run_diagnostics_notebook',
     'abundance_error_table',
 ]

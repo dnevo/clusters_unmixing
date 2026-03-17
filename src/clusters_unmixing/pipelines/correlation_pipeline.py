@@ -109,7 +109,7 @@ def _make_synthetic_pixels(endmembers: np.ndarray, num_pixels: int, snr_db: floa
 
 
 def run_correlation_experiments(config_path: str | Path) -> dict[str, Any]:
-    exp = ExperimentConfig.from_json_file(config_path)
+    exp = ExperimentConfig.from_file(config_path)
     output_dir = _resolve_output_dir(exp) / exp.run_name
     output_dir.mkdir(parents=True, exist_ok=True)
     runs = _planned_model_runs(exp)

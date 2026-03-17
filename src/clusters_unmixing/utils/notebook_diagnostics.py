@@ -17,7 +17,7 @@ from clusters_unmixing.transforms import apply_normalization, apply_transform, s
 from clusters_unmixing.utils.diagnostics import display_abundance_comparison_tables, plot_cluster_overview
 
 
-def configure_notebook(project_root: str | Path | None = None, autoreload: bool = True) -> Path:
+def configure_notebook(project_root: str | Path | None = None) -> Path:
     note_dir = Path.cwd()
     resolved_root = Path(project_root).resolve() if project_root is not None else (
         note_dir.parent if note_dir.name == 'notebooks' else note_dir
@@ -25,24 +25,9 @@ def configure_notebook(project_root: str | Path | None = None, autoreload: bool 
     src_dir = resolved_root / 'src'
     if str(src_dir) not in sys.path:
         sys.path.insert(0, str(src_dir))
-    if autoreload:
-        try:
-            from IPython import get_ipython
-            ip = get_ipython()
-            if ip is not None:
-                ip.run_line_magic('load_ext', 'autoreload')
-                ip.run_line_magic('autoreload', '2')
-        except Exception:
-            pass
     pd.set_option('display.max_columns', 200)
     pd.set_option('display.width', 180)
     return resolved_root
-
-
-def default_config_path(project_root: str | Path | None = None) -> Path:
-    root = configure_notebook(project_root=project_root, autoreload=False)
-    return root / 'experiments' / 'configs' / 'correlation_options.yaml'
-
 
 
 def _bands_key(raw_bands_ranges: list[Any]) -> str:
@@ -142,11 +127,15 @@ def plot_pixel_preview(
 
 
 def run_diagnostics_notebook(config_path: str | Path | None = None, project_root: str | Path | None = None) -> dict[str, Any]:
-    root = configure_notebook(project_root=project_root, autoreload=False)
-    resolved_config = Path(config_path).resolve() if config_path is not None else default_config_path(root)
+    root = configure_notebook(project_root=project_root)
+    if config_path is not None:
+        resolved_config = Path(config_path).resolve()
+    else:
+        resolved_config = root / 'experiments' / 'configs' / 'correlation_options.yaml'
+
 
     result = run_correlation_experiments(resolved_config)
-    config = ExperimentConfig.from_json_file(resolved_config)
+    config = ExperimentConfig.from_file(resolved_config)
     cluster_paths = _cluster_path_map(config, project_root=root)
 
     summary_path = Path(result['summary_path'])

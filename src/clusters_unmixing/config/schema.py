@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import yaml
+
 from pathlib import Path
 from typing import Any, Literal
 
@@ -225,14 +227,10 @@ class ExperimentConfig(BaseModel):
         return cls.model_validate(payload)
 
     @classmethod
-    def from_json_file(cls, config_path: str | Path) -> "ExperimentConfig":
+    def from_file(cls, config_path: str | Path) -> "ExperimentConfig":
         path = Path(config_path)
         text = path.read_text(encoding="utf-8")
-        if path.suffix.lower() in {".yaml", ".yml"}:
-            import yaml
-            raw = yaml.safe_load(text)
-        else:
-            raw = json.loads(text)
+        raw = yaml.safe_load(text)
         config_dir = path.parent.resolve()
         for candidate in [config_dir, *config_dir.parents]:
             if (candidate / "pyproject.toml").exists() or (candidate / ".git").exists():
