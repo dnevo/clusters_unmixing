@@ -79,7 +79,7 @@ model_evaluation:
 
 
       # signal-to-noise ratio
-      snr_db: inf # number (e.g 30.0) or inf (for no noise)
+      snr_db: 20.0 # number (e.g 30.0) or inf (for no noise)
 
       models:
         - sunsal

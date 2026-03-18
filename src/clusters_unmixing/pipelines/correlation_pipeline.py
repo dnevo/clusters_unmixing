@@ -73,15 +73,16 @@ def _apply_normalization(signatures: np.ndarray, wavelengths: np.ndarray, normal
     raise ValueError(f"Unsupported normalization mode: {normalization}")
 
 
-def _build_projection(exp: ExperimentConfig, run: dict[str, Any]) -> tuple[np.ndarray, np.ndarray]:
-    cluster_cfg = next(item for item in exp.cluster_sets if item.name == run["cluster_set"])
-    cluster_path = _resolve_cluster_path(exp, cluster_cfg.path)
-    wavelengths, signatures = load_wavelength_and_cluster_matrix(cluster_path)
-    wavelengths_sel, signatures_sel, _ = select_wavelength_ranges(wavelengths, signatures, run["bands_ranges"])
-    processed = _apply_normalization(signatures_sel, wavelengths_sel, run["normalization"])
+def _build_projection(
+    run: dict[str, Any],
+    wavelengths: np.ndarray,
+    raw_endmembers: np.ndarray,
+) -> np.ndarray:
+    wavelengths_sel, selected_endmembers, _ = select_wavelength_ranges(wavelengths, raw_endmembers, run["bands_ranges"])
+    processed = _apply_normalization(selected_endmembers, wavelengths_sel, run["normalization"])
     for name, params in run["transform_steps"]:
         processed = apply_transform(processed, name, params)
-    return wavelengths_sel, processed
+    return  processed
 
 
 def _set_global_seeds(seed: int) -> None:
@@ -132,9 +133,15 @@ def run_correlation_experiments(exp: ExperimentConfig) -> dict[str, Any]:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     for idx, run in enumerate(runs, start=1):
-        wavelengths, endmembers = _build_projection(exp, run)
+        cluster_cfg = next(item for item in exp.cluster_sets if item.name == run["cluster_set"])
+        cluster_path = _resolve_cluster_path(exp, cluster_cfg.path)
+        wavelengths, raw_endmembers = load_wavelength_and_cluster_matrix(cluster_path)
+        projected_endmembers = _build_projection(run, wavelengths, raw_endmembers)
+        _set_global_seeds(0)
+        projected_pixels, true_abundances = _make_synthetic_pixels(projected_endmembers, run['num_pixels'], run['snr_db'])
+
         for metric in exp.metrics:
-            matrix = compute_correlation_matrix(endmembers, metric)
+            matrix = compute_correlation_matrix(projected_endmembers, metric)
             stats = summarize_correlation_matrix(matrix)
             row = {
                 'run_index': idx,
@@ -147,11 +154,8 @@ def run_correlation_experiments(exp: ExperimentConfig) -> dict[str, Any]:
             }
             summary_rows.append(row)
 
-        _set_global_seeds(0)
-        pixels, true_abundances = _make_synthetic_pixels(endmembers, run['num_pixels'], run['snr_db'])
-        endmembers_t = torch.tensor(endmembers, dtype=torch.float32, device=device)
-        pixels_t = torch.tensor(pixels, dtype=torch.float32, device=device)
-        true_abundances_t = torch.tensor(true_abundances, dtype=torch.float32, device=device)
+        endmembers_t = torch.tensor(projected_endmembers, dtype=torch.float32, device=device)
+        projected_pixels_t = torch.tensor(projected_pixels, dtype=torch.float32, device=device)
 
         n_preview_available = int(true_abundances.shape[0])
         preview_pixels: list[int] = []
@@ -170,7 +174,7 @@ def run_correlation_experiments(exp: ExperimentConfig) -> dict[str, Any]:
                 'snr_db': run['snr_db'],
                 'pixel_index': int(sample_idx),
             }
-            for band_idx, value in enumerate(pixels[sample_idx], start=1):
+            for band_idx, value in enumerate(projected_pixels[sample_idx], start=1):
                 row[f'band_{band_idx}'] = float(value)
             spectra_preview_rows.append(row)
 
@@ -179,7 +183,7 @@ def run_correlation_experiments(exp: ExperimentConfig) -> dict[str, Any]:
             abundances_t, metadata = run_registered_model(
                 model_name=model_spec['name'],
                 endmembers=endmembers_t,
-                pixels=pixels_t,
+                pixels=projected_pixels_t,
                 params=model_spec['params'],
             )
             abundances = abundances_t.detach().cpu().numpy()
@@ -197,7 +201,7 @@ def run_correlation_experiments(exp: ExperimentConfig) -> dict[str, Any]:
                     'metric': metric_name,
                     'mean': value,
                     'iterations_logged': metadata.get('iterations_logged', 0),
-                    'last_active_pixels': metadata.get('last_active_pixels', pixels.shape[0]),
+                    'last_active_pixels': metadata.get('last_active_pixels', projected_pixels.shape[0]),
                 })
             for sample_idx in preview_pixels:
                 row = {
