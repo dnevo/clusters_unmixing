@@ -108,8 +108,8 @@ def _make_synthetic_pixels(endmembers: np.ndarray, num_pixels: int, snr_db: floa
     return noisy_pixels.detach().cpu().numpy(), abundances.detach().cpu().numpy()
 
 
-def run_correlation_experiments(config_path: str | Path) -> dict[str, Any]:
-    exp = ExperimentConfig.from_file(config_path)
+def run_correlation_experiments(exp: ExperimentConfig) -> dict[str, Any]:
+    # exp = ExperimentConfig.from_file(config_path)
     output_dir = _resolve_output_dir(exp) / exp.run_name
     output_dir.mkdir(parents=True, exist_ok=True)
     runs = _planned_model_runs(exp)

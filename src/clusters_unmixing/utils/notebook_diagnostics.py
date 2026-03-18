@@ -127,9 +127,9 @@ def plot_pixel_preview(
 
 
 def run_diagnostics_notebook(config_path: Path, project_root: Path) -> dict[str, Any]:
-    result = run_correlation_experiments(config_path)
-    config = ExperimentConfig.from_file(config_path)
-    cluster_paths = _cluster_path_map(config, project_root=project_root)
+    experiment_config = ExperimentConfig.from_file(config_path)
+    result = run_correlation_experiments(experiment_config)
+    cluster_paths = _cluster_path_map(experiment_config, project_root=project_root)
 
     summary_path = Path(result['summary_path'])
     model_summary_path = Path(result['model_evaluation']['summary_path'])
@@ -145,7 +145,7 @@ def run_diagnostics_notebook(config_path: Path, project_root: Path) -> dict[str,
     display(corr_df.round(6))
     display(model_df.round(6))
 
-    model_eval = config.model_evaluation
+    model_eval = experiment_config.model_evaluation
     for run_index, run_cfg in enumerate(model_eval.runs, start=1):
         display(Markdown(f'---\n## Run {run_index}/{len(model_eval.runs)}'))
 
