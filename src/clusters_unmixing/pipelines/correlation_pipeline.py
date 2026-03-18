@@ -77,12 +77,36 @@ def _build_projection(
     run: dict[str, Any],
     wavelengths: np.ndarray,
     raw_endmembers: np.ndarray,
-) -> np.ndarray:
-    wavelengths_sel, selected_endmembers, _ = select_wavelength_ranges(wavelengths, raw_endmembers, run["bands_ranges"])
-    processed = _apply_normalization(selected_endmembers, wavelengths_sel, run["normalization"])
+    raw_pixels: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:
+    wavelengths_sel, selected_endmembers, mask = select_wavelength_ranges(
+        wavelengths,
+        raw_endmembers,
+        run["bands_ranges"],
+    )
+    _, selected_pixels, _ = select_wavelength_ranges(
+        wavelengths,
+        raw_pixels.T,
+        run["bands_ranges"],
+    )
+    selected_pixels = selected_pixels.T
+
+    projected_endmembers = _apply_normalization(
+        selected_endmembers,
+        wavelengths_sel,
+        run["normalization"],
+    )
+    projected_pixels = _apply_normalization(
+        selected_pixels.T,
+        wavelengths_sel,
+        run["normalization"],
+    ).T
+
     for name, params in run["transform_steps"]:
-        processed = apply_transform(processed, name, params)
-    return  processed
+        projected_endmembers = apply_transform(projected_endmembers, name, params)
+        projected_pixels = apply_transform(projected_pixels.T, name, params).T
+
+    return projected_endmembers, projected_pixels
 
 
 def _set_global_seeds(seed: int) -> None:
@@ -136,10 +160,20 @@ def run_correlation_experiments(exp: ExperimentConfig) -> dict[str, Any]:
         cluster_cfg = next(item for item in exp.cluster_sets if item.name == run["cluster_set"])
         cluster_path = _resolve_cluster_path(exp, cluster_cfg.path)
         wavelengths, raw_endmembers = load_wavelength_and_cluster_matrix(cluster_path)
-        projected_endmembers = _build_projection(run, wavelengths, raw_endmembers)
-        _set_global_seeds(0)
-        projected_pixels, true_abundances = _make_synthetic_pixels(projected_endmembers, run['num_pixels'], run['snr_db'])
 
+        _set_global_seeds(0)
+        raw_pixels, true_abundances = _make_synthetic_pixels(
+            raw_endmembers,
+            run["num_pixels"],
+            run["snr_db"],
+        )
+
+        projected_endmembers, projected_pixels = _build_projection(
+            run,
+            wavelengths,
+            raw_endmembers,
+            raw_pixels,
+        )
         for metric in exp.metrics:
             matrix = compute_correlation_matrix(projected_endmembers, metric)
             stats = summarize_correlation_matrix(matrix)

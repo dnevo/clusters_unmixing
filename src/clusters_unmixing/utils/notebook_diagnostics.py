@@ -95,7 +95,7 @@ def plot_pixel_preview(
     wavelengths_full: np.ndarray,
     endmembers_full: np.ndarray,
     abundance_rows: pd.DataFrame,
-    spectra_rows: pd.DataFrame,
+    snr_db: float,
 ) -> go.Figure:
     row_sunsal = abundance_rows[(abundance_rows['pixel_index'] == pixel_index) & (abundance_rows['model'] == 'sunsal')].iloc[0]
     row_vpgdu = abundance_rows[(abundance_rows['pixel_index'] == pixel_index) & (abundance_rows['model'] == 'vpgdu')].iloc[0]
@@ -103,11 +103,14 @@ def plot_pixel_preview(
     a_sunsal = abundance_vector(row_sunsal, 'est_a')
     a_vpgdu = abundance_vector(row_vpgdu, 'est_a')
     y_clean = np.asarray(endmembers_full @ a_true, dtype=float)
-    band_cols = [c for c in spectra_rows.columns if str(c).startswith('band_')]
-    if len(band_cols) == len(wavelengths_full) and pixel_index in set(spectra_rows['pixel_index'].astype(int)):
-        y_noisy = spectra_rows.loc[spectra_rows['pixel_index'] == pixel_index, band_cols].iloc[0].to_numpy(dtype=float)
-    else:
+    if np.isinf(float(snr_db)):
         y_noisy = y_clean.copy()
+    else:
+        signal_power = float(np.mean(y_clean ** 2))
+        signal_rms = float(np.sqrt(max(signal_power, 0.0)))
+        noise_std = signal_rms * float(10.0 ** (-float(snr_db) / 20.0))
+        rng = np.random.default_rng(seed=int(pixel_index))
+        y_noisy = y_clean + rng.normal(loc=0.0, scale=noise_std, size=y_clean.shape)
     y_sunsal = np.asarray(endmembers_full @ a_sunsal, dtype=float)
     y_vpgdu = np.asarray(endmembers_full @ a_vpgdu, dtype=float)
     fig = go.Figure()
@@ -134,12 +137,10 @@ def run_diagnostics_notebook(config_path: Path, project_root: Path) -> dict[str,
     summary_path = Path(result['summary_path'])
     model_summary_path = Path(result['model_evaluation']['summary_path'])
     abundance_preview_path = Path(result['model_evaluation']['abundance_preview_path'])
-    spectra_preview_path = Path(result['model_evaluation']['spectra_preview_path'])
 
     corr_df = pd.read_csv(summary_path)
     model_df = pd.read_csv(model_summary_path)
     abundance_df = pd.read_csv(abundance_preview_path)
-    spectra_df = pd.read_csv(spectra_preview_path)
 
     display(Markdown(f"**Run name:** `{result['run_name']}`\n\n**Output dir:** `{result['output_dir']}`"))
     display(corr_df.round(6))
@@ -232,13 +233,6 @@ def run_diagnostics_notebook(config_path: Path, project_root: Path) -> dict[str,
         display(Markdown('### Abundance error summary'))
         display(abundance_error_table(abundance_rows))
 
-        spectra_rows = spectra_df[
-            (spectra_df['cluster_set'] == cluster_set)
-            & (spectra_df['bands_ranges'] == bands_key)
-            & (spectra_df['normalization'] == normalization)
-            & (spectra_df['transform'] == transform_label)
-            & (spectra_df['snr_db'].astype(float) == float(snr_db))
-        ].copy()
         display(Markdown('### Synthetic pixel spectra preview'))
         endmembers_full_for_plot = apply_normalization(signatures_full, wavelengths_full, normalization)
         for pixel_index in sorted(abundance_rows['pixel_index'].astype(int).unique()):
@@ -247,7 +241,7 @@ def run_diagnostics_notebook(config_path: Path, project_root: Path) -> dict[str,
                 wavelengths_full=wavelengths_full,
                 endmembers_full=endmembers_full_for_plot,
                 abundance_rows=abundance_rows,
-                spectra_rows=spectra_rows,
+                snr_db=snr_db,
             ))
 
     return {
@@ -255,5 +249,4 @@ def run_diagnostics_notebook(config_path: Path, project_root: Path) -> dict[str,
         'corr_df': corr_df,
         'model_df': model_df,
         'abundance_df': abundance_df,
-        'spectra_df': spectra_df,
     }
