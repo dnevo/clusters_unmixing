@@ -15,7 +15,7 @@ def _bands_key(raw_bands_ranges: list[Any]) -> str:
 
 
 def build_model_run_comparisons(config_path: str | Path, model_summary_path: str | Path) -> list[dict[str, Any]]:
-    config = ExperimentConfig.from_json_file(config_path)
+    config = ExperimentConfig.from_file(config_path)
     summary_df = pd.read_csv(model_summary_path)
     model_eval = config.model_evaluation
     runs = list(model_eval.runs)
@@ -43,12 +43,11 @@ def build_model_run_comparisons(config_path: str | Path, model_summary_path: str
     return payloads
 
 
-def build_model_run_diagnostics(config_path: str | Path, correlation_summary_path: str | Path, model_summary_path: str | Path, abundance_preview_path: str | Path | None = None, spectra_preview_path: str | Path | None = None) -> list[dict[str, Any]]:
-    config = ExperimentConfig.from_json_file(config_path)
+def build_model_run_diagnostics(config_path: str | Path, correlation_summary_path: str | Path, model_summary_path: str | Path, abundance_preview_path: str | Path | None = None) -> list[dict[str, Any]]:
+    config = ExperimentConfig.from_file(config_path)
     corr_df = pd.read_csv(correlation_summary_path) if Path(correlation_summary_path).exists() and Path(correlation_summary_path).stat().st_size else pd.DataFrame()
     model_df = pd.read_csv(model_summary_path) if Path(model_summary_path).exists() and Path(model_summary_path).stat().st_size else pd.DataFrame()
     abundance_df = pd.read_csv(abundance_preview_path) if abundance_preview_path and Path(abundance_preview_path).exists() and Path(abundance_preview_path).stat().st_size else pd.DataFrame()
-    spectra_df = pd.read_csv(spectra_preview_path) if spectra_preview_path and Path(spectra_preview_path).exists() and Path(spectra_preview_path).stat().st_size else pd.DataFrame()
     model_eval = config.model_evaluation
     runs = list(model_eval.runs)
     payloads = []
@@ -71,7 +70,6 @@ def build_model_run_diagnostics(config_path: str | Path, correlation_summary_pat
         ]
         metric_rows = corr_rows[['metric', 'mean_abs_offdiag', 'max_abs_offdiag', 'min_offdiag', 'max_offdiag']].to_dict(orient='records') if not corr_rows.empty else []
         abundance_table = abundance_df[abundance_df['run_index'] == run_index].copy() if not abundance_df.empty else pd.DataFrame()
-        spectra_preview = spectra_df[spectra_df['run_index'] == run_index].copy() if not spectra_df.empty else pd.DataFrame()
         payloads.append({
             'run_index': run_index,
             'run_count': len(runs),
@@ -81,7 +79,6 @@ def build_model_run_diagnostics(config_path: str | Path, correlation_summary_pat
             'snr_db': snr_db,
             'comparison': comparison_table,
             'abundance_table': abundance_table,
-            'spectra_preview': spectra_preview,
             'models': run.normalized_models(),
             'projection_group': {'metric_rows': metric_rows, 'bands_ranges': run.serialized_bands_ranges()},
         })
@@ -138,20 +135,6 @@ def display_abundance_comparison_tables(abundance_df: pd.DataFrame, max_pixels: 
     for item in tables:
         display(Markdown(f"### Abundances  |  pixel_index={item['pixel_index']}"))
         display(item['table'])
-
-
-def display_spectra_preview_plots(spectra_preview: pd.DataFrame | None, models: list[str] | None = None) -> go.Figure | None:
-    if spectra_preview is None or spectra_preview.empty:
-        return None
-    band_cols = [col for col in spectra_preview.columns if str(col).startswith('band_')]
-    if not band_cols:
-        return None
-    fig = go.Figure()
-    for _, row in spectra_preview.head(3).iterrows():
-        fig.add_trace(go.Scatter(y=[row[col] for col in band_cols], mode='lines', name=str(row.get('model', 'sample'))))
-    return fig
-
-
 def plot_cluster_overview(
     wavelengths: Any,
     signatures: Any,

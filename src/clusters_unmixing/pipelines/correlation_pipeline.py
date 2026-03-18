@@ -141,7 +141,6 @@ def run_correlation_experiments(exp: ExperimentConfig) -> dict[str, Any]:
     summary_rows: list[dict[str, Any]] = []
     model_rows: list[dict[str, Any]] = []
     abundance_preview_rows: list[dict[str, Any]] = []
-    spectra_preview_rows: list[dict[str, Any]] = []
 
     if not runs:
         summary_path = output_dir / 'correlation_summary.csv'
@@ -198,20 +197,6 @@ def run_correlation_experiments(exp: ExperimentConfig) -> dict[str, Any]:
             preview_pixels = np.random.choice(n_preview_available, size=preview_limit, replace=False).astype(int).tolist()
             preview_pixels.sort()
 
-        for sample_idx in preview_pixels:
-            row = {
-                'run_index': idx,
-                'cluster_set': run['cluster_set'],
-                'bands_ranges': run['bands_ranges_key'],
-                'normalization': run['normalization'],
-                'transform': run['transform'],
-                'snr_db': run['snr_db'],
-                'pixel_index': int(sample_idx),
-            }
-            for band_idx, value in enumerate(projected_pixels[sample_idx], start=1):
-                row[f'band_{band_idx}'] = float(value)
-            spectra_preview_rows.append(row)
-
         for model_spec in run['models']:
             _set_global_seeds(0)
             abundances_t, metadata = run_registered_model(
@@ -259,11 +244,9 @@ def run_correlation_experiments(exp: ExperimentConfig) -> dict[str, Any]:
     model_dir.mkdir(parents=True, exist_ok=True)
     model_summary_path = model_dir / 'model_summary.csv'
     abundance_preview_path = model_dir / 'abundance_preview.csv'
-    spectra_preview_path = model_dir / 'spectra_preview.csv'
     pd.DataFrame(summary_rows).to_csv(summary_path, index=False)
     pd.DataFrame(model_rows).to_csv(model_summary_path, index=False)
     pd.DataFrame(abundance_preview_rows).to_csv(abundance_preview_path, index=False)
-    pd.DataFrame(spectra_preview_rows).to_csv(spectra_preview_path, index=False)
     return {
         'run_name': exp.run_name,
         'output_dir': str(output_dir),
@@ -273,7 +256,6 @@ def run_correlation_experiments(exp: ExperimentConfig) -> dict[str, Any]:
             'n_runs': len(runs),
             'summary_path': str(model_summary_path),
             'abundance_preview_path': str(abundance_preview_path),
-            'spectra_preview_path': str(spectra_preview_path),
         },
     }
 
