@@ -17,7 +17,7 @@ from clusters_unmixing.transforms import apply_normalization, apply_transform, s
 from clusters_unmixing.utils.diagnostics import display_abundance_comparison_tables, plot_cluster_overview
 
 
-def configure_notebook(project_root: str | Path | None = None) -> Path:
+def setup_notebook_imports(project_root: str | Path | None = None) -> Path:
     note_dir = Path.cwd()
     resolved_root = Path(project_root).resolve() if project_root is not None else (
         note_dir.parent if note_dir.name == 'notebooks' else note_dir
@@ -126,17 +126,10 @@ def plot_pixel_preview(
     return fig
 
 
-def run_diagnostics_notebook(config_path: str | Path | None = None, project_root: str | Path | None = None) -> dict[str, Any]:
-    root = configure_notebook(project_root=project_root)
-    if config_path is not None:
-        resolved_config = Path(config_path).resolve()
-    else:
-        resolved_config = root / 'experiments' / 'configs' / 'correlation_options.yaml'
-
-
-    result = run_correlation_experiments(resolved_config)
-    config = ExperimentConfig.from_file(resolved_config)
-    cluster_paths = _cluster_path_map(config, project_root=root)
+def run_diagnostics_notebook(config_path: Path, project_root: Path) -> dict[str, Any]:
+    result = run_correlation_experiments(config_path)
+    config = ExperimentConfig.from_file(config_path)
+    cluster_paths = _cluster_path_map(config, project_root=project_root)
 
     summary_path = Path(result['summary_path'])
     model_summary_path = Path(result['model_evaluation']['summary_path'])

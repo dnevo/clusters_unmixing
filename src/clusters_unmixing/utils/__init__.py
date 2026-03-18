@@ -7,7 +7,7 @@ from .diagnostics import (
 )
 from .notebook_diagnostics import (
     abundance_error_table,
-    configure_notebook,
+    setup_notebook_imports,
     run_diagnostics_notebook,
 )
 
@@ -17,7 +17,7 @@ __all__ = [
     'display_projection_reflectance',
     'display_spectra_preview_plots',
     'plot_cluster_overview',
-    'configure_notebook',
+    'setup_notebook_imports',
     'run_diagnostics_notebook',
     'abundance_error_table',
 ]
