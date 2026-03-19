@@ -15,7 +15,6 @@ from clusters_unmixing.dataio.clusters import load_wavelength_and_cluster_matrix
 from clusters_unmixing.pipelines import run_correlation_experiments
 from clusters_unmixing.transforms import apply_normalization, apply_transform, select_wavelength_ranges
 from clusters_unmixing.utils.diagnostics import (
-    build_model_run_comparisons,
     build_model_run_diagnostics,
     display_abundance_comparison_tables,
     plot_cluster_overview,
@@ -144,7 +143,6 @@ def run_diagnostics_notebook(config_path: Path, project_root: Path) -> None:
 
     model_df = pd.read_csv(model_summary_path)
     abundance_df = pd.read_csv(abundance_preview_path)
-    comparison_payloads = build_model_run_comparisons(config_path=config_path, model_summary_path=model_summary_path)
 
     display(Markdown(f"**Run name:** `{result['run_name']}`\n\n**Output dir:** `{result['output_dir']}`"))
 
@@ -228,11 +226,6 @@ def run_diagnostics_notebook(config_path: Path, project_root: Path) -> None:
             stats_payload[step_name] = cosine_offdiag_stats(transformed)
 
         display(stats_table(stats_payload))
-
-        helper_comparison = comparison_payloads[run_index - 1]['comparison']
-        if not helper_comparison.empty:
-            display(Markdown('### Model comparison helper view'))
-            display(helper_comparison.round(6))
 
         model_rows = model_df[
             (model_df['cluster_set'] == cluster_set)

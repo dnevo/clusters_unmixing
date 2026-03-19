@@ -14,35 +14,6 @@ def _bands_key(raw_bands_ranges: list[Any]) -> str:
     return json.dumps(raw_bands_ranges, separators=(",", ":"), ensure_ascii=False)
 
 
-def build_model_run_comparisons(config_path: str | Path, model_summary_path: str | Path) -> list[dict[str, Any]]:
-    config = ExperimentConfig.from_file(config_path)
-    summary_df = pd.read_csv(model_summary_path)
-    model_eval = config.model_evaluation
-    runs = list(model_eval.runs)
-    payloads = []
-    for run_index, run in enumerate(runs, start=1):
-        bands_key = _bands_key(run.serialized_bands_ranges())
-        snr_db = run.resolved_snr_db()
-        filtered = summary_df[
-            (summary_df['cluster_set'] == run.cluster_set)
-            & (summary_df['bands_ranges'] == bands_key)
-            & (summary_df['normalization'] == run.normalized_normalization())
-            & (summary_df['transform'] == run.normalized_transform())
-            & (summary_df['snr_db'].astype(float) == float(snr_db))
-        ]
-        comparison = filtered.pivot(index='metric', columns='model', values='mean').sort_index() if not filtered.empty else pd.DataFrame()
-        payloads.append({
-            'run_index': run_index,
-            'run_count': len(runs),
-            'cluster_set': run.cluster_set,
-            'normalization': run.normalized_normalization(),
-            'transform': run.normalized_transform(),
-            'snr_db': snr_db,
-            'comparison': comparison,
-        })
-    return payloads
-
-
 def build_model_run_diagnostics(config_path: str | Path, correlation_summary_path: str | Path, model_summary_path: str | Path, abundance_preview_path: str | Path | None = None) -> list[dict[str, Any]]:
     config = ExperimentConfig.from_file(config_path)
     corr_df = pd.read_csv(correlation_summary_path) if Path(correlation_summary_path).exists() and Path(correlation_summary_path).stat().st_size else pd.DataFrame()
@@ -83,11 +54,6 @@ def build_model_run_diagnostics(config_path: str | Path, correlation_summary_pat
             'projection_group': {'metric_rows': metric_rows, 'bands_ranges': run.serialized_bands_ranges()},
         })
     return payloads
-
-
-def display_projection_reflectance(groups: list[dict[str, Any]]) -> None:
-    for group in groups:
-        display(pd.DataFrame(group['metric_rows']))
 
 
 def _resolve_abundance_columns(abundance_df: pd.DataFrame) -> tuple[list[str], list[str]]:
