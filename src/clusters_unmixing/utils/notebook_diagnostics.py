@@ -14,7 +14,12 @@ from clusters_unmixing.config import ExperimentConfig
 from clusters_unmixing.dataio.clusters import load_wavelength_and_cluster_matrix
 from clusters_unmixing.pipelines import run_correlation_experiments
 from clusters_unmixing.transforms import apply_normalization, apply_transform, select_wavelength_ranges
-from clusters_unmixing.utils.diagnostics import display_abundance_comparison_tables, plot_cluster_overview
+from clusters_unmixing.utils.diagnostics import (
+    build_model_run_comparisons,
+    build_model_run_diagnostics,
+    display_abundance_comparison_tables,
+    plot_cluster_overview,
+)
 
 
 def setup_notebook_imports(project_root: str | Path | None = None) -> Path:
@@ -129,22 +134,19 @@ def plot_pixel_preview(
     return fig
 
 
-def run_diagnostics_notebook(config_path: Path, project_root: Path) -> dict[str, Any]:
+def run_diagnostics_notebook(config_path: Path, project_root: Path) -> None:
     experiment_config = ExperimentConfig.from_file(config_path)
     result = run_correlation_experiments(experiment_config)
     cluster_paths = _cluster_path_map(experiment_config, project_root=project_root)
 
-    summary_path = Path(result['summary_path'])
     model_summary_path = Path(result['model_evaluation']['summary_path'])
     abundance_preview_path = Path(result['model_evaluation']['abundance_preview_path'])
 
-    corr_df = pd.read_csv(summary_path)
     model_df = pd.read_csv(model_summary_path)
     abundance_df = pd.read_csv(abundance_preview_path)
+    comparison_payloads = build_model_run_comparisons(config_path=config_path, model_summary_path=model_summary_path)
 
     display(Markdown(f"**Run name:** `{result['run_name']}`\n\n**Output dir:** `{result['output_dir']}`"))
-    display(corr_df.round(6))
-    display(model_df.round(6))
 
     model_eval = experiment_config.model_evaluation
     for run_index, run_cfg in enumerate(model_eval.runs, start=1):
@@ -158,17 +160,32 @@ def run_diagnostics_notebook(config_path: Path, project_root: Path) -> dict[str,
         snr_db = run_cfg.resolved_snr_db()
         bands_key = _bands_key(run_cfg.serialized_bands_ranges())
 
-        config_view = pd.DataFrame([
+        bands_label = ", ".join(
+            f"{x_min:g}-{x_max:g} {reduce}"
+            for x_min, x_max, reduce in bands_ranges
+        )
+        config_view = pd.DataFrame(
             {
-                'cluster_set': cluster_set,
-                'bands_ranges': bands_key,
-                'normalization': normalization,
-                'transform': transform_label,
-                'num_pixels': run_cfg.resolved_num_pixels(),
-                'snr_db': snr_db,
-                'models': ', '.join(run_cfg.normalized_models()),
-            }
-        ])
+                'value': [
+                    cluster_set,
+                    bands_label,
+                    normalization,
+                    transform_label,
+                    run_cfg.resolved_num_pixels(),
+                    f'{snr_db:g} dB' if np.isfinite(snr_db) else 'inf',
+                    ', '.join(run_cfg.normalized_models()),
+                ]
+            },
+            index=[
+                'cluster set',
+                'bands',
+                'normalization',
+                'transform',
+                'pixels',
+                'snr',
+                'models',
+            ],
+        )
         display(config_view)
 
         cluster_path = cluster_paths[cluster_set]
@@ -212,6 +229,11 @@ def run_diagnostics_notebook(config_path: Path, project_root: Path) -> dict[str,
 
         display(stats_table(stats_payload))
 
+        helper_comparison = comparison_payloads[run_index - 1]['comparison']
+        if not helper_comparison.empty:
+            display(Markdown('### Model comparison helper view'))
+            display(helper_comparison.round(6))
+
         model_rows = model_df[
             (model_df['cluster_set'] == cluster_set)
             & (model_df['bands_ranges'] == bands_key)
@@ -243,10 +265,3 @@ def run_diagnostics_notebook(config_path: Path, project_root: Path) -> dict[str,
                 abundance_rows=abundance_rows,
                 snr_db=snr_db,
             ))
-
-    return {
-        'result': result,
-        'corr_df': corr_df,
-        'model_df': model_df,
-        'abundance_df': abundance_df,
-    }
