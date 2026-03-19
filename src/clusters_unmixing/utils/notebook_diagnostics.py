@@ -73,22 +73,6 @@ def format_model_metrics_table(model_df: pd.DataFrame) -> pd.DataFrame:
     return pivot.sort_index().round(6)
 
 
-def abundance_error_table(abundance_df: pd.DataFrame) -> pd.DataFrame:
-    rows = []
-    true_cols = sorted([c for c in abundance_df.columns if str(c).startswith('true_a')])
-    pred_cols = sorted([c for c in abundance_df.columns if str(c).startswith('est_a')])
-    for _, row in abundance_df.iterrows():
-        true_vals = np.asarray(row[true_cols], dtype=float)
-        pred_vals = np.asarray(row[pred_cols], dtype=float)
-        rows.append({
-            'model': row['model'],
-            'pixel_index': int(row['pixel_index']),
-            'rmse': float(np.sqrt(np.mean((pred_vals - true_vals) ** 2))),
-            'mae': float(np.mean(np.abs(pred_vals - true_vals))),
-        })
-    return pd.DataFrame(rows).sort_values(['pixel_index', 'model']).reset_index(drop=True).round(6)
-
-
 def abundance_vector(row: pd.Series, prefix: str) -> np.ndarray:
     cols = sorted([c for c in row.index if str(c).startswith(prefix)])
     return row[cols].to_numpy(dtype=float)
@@ -245,8 +229,6 @@ def run_diagnostics_notebook(config_path: Path, project_root: Path) -> None:
         ].copy()
         display(Markdown('### Abundance comparison by sampled pixel'))
         display_abundance_comparison_tables(abundance_rows, max_pixels=5)
-        display(Markdown('### Abundance error summary'))
-        display(abundance_error_table(abundance_rows))
 
         display(Markdown('### Synthetic pixel spectra preview'))
         endmembers_full_for_plot = apply_normalization(signatures_full, wavelengths_full, normalization)
