@@ -12,5 +12,5 @@ if str(SRC_DIR) not in sys.path:
 from clusters_unmixing.utils import setup_notebook_imports, run_diagnostics_notebook
 
 setup_notebook_imports(project_root=PROJECT_ROOT)
-run_diagnostics_notebook(config_path=default_config_path(PROJECT_ROOT), project_root=PROJECT_ROOT)
-
+CONFIG_PATH = PROJECT_ROOT / "experiments" / "configs" / "correlation_options.yaml"
+run_diagnostics_notebook(config_path=CONFIG_PATH, project_root=PROJECT_ROOT)

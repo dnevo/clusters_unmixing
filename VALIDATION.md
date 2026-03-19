@@ -1,25 +1,23 @@
-﻿# Validation report
+# Validation report
 
-## Result
-- Editable install: passed
-- Test suite: 11 passed
-- Notebook added: `notebooks/00_cluster_diagnostics.ipynb`
-- Notebook smoke validation: passed via extracted Python execution of notebook code cells
+## Summary
+- Package metadata is present in `pyproject.toml`.
+- The command-line entrypoint in `main.py` now loads `experiments/configs/correlation_options.yaml`.
+- The notebook smoke script and notebook helpers are aligned with the current flattened module layout.
+- `src/clusters_unmixing/models/sunsal.py` and `src/clusters_unmixing/models/vpgdu.py` remain unchanged.
 
-## Commands
+## Validation commands
 ```bash
 python -m pip install -e .
-pytest -q
+python main.py
 python notebooks/_notebook_smoke.py
 ```
 
 ## Notes
-- `src/clusters_unmixing/models/sunsal.py` unchanged
-- `src/clusters_unmixing/models/vpgdu.py` unchanged
-- The new notebook covers the same practical scope as the original one: run experiments, inspect raw/normalized/transformed spectra, compare correlation statistics, review model metrics, and preview abundances / synthetic pixels.
-- Full Jupyter kernel execution was not persisted as an executed notebook artifact in this environment, but the notebook code itself was syntax-checked and smoke-tested successfully by running the extracted code cells as a script.
+- The repository currently has no `tests/` directory, so `pytest` is not part of the current validation story.
+- Recent refactors flattened `dataio/clusters.py` into `dataio.py` and `metrics/correlation.py` into `metrics.py`.
+- Project documentation was updated to reflect the current structure and entry points.
 
 ## Source footprint
-- Python files counted (src + tests): 26
-- Total lines (src + tests): 1880
-
+- Python files counted: 21
+- Total Python lines: 1457
