@@ -11,8 +11,8 @@ import torch
 
 from clusters_unmixing.config.schema import ExperimentConfig
 from clusters_unmixing.data import generate_samples
-from clusters_unmixing.dataio.clusters import load_wavelength_and_cluster_matrix
-from clusters_unmixing.metrics.correlation import compute_correlation_matrix, summarize_correlation_matrix
+from clusters_unmixing.dataio import load_wavelength_and_cluster_matrix
+from clusters_unmixing.metrics import compute_correlation_matrix, summarize_correlation_matrix
 from clusters_unmixing.models.runner_registry import run_registered_model
 from clusters_unmixing.transforms.spectral_views import apply_transform, select_wavelength_ranges
 
@@ -134,7 +134,6 @@ def _make_synthetic_pixels(endmembers: np.ndarray, num_pixels: int, snr_db: floa
 
 
 def run_correlation_experiments(exp: ExperimentConfig) -> dict[str, Any]:
-    # exp = ExperimentConfig.from_file(config_path)
     output_dir = _resolve_output_dir(exp) / exp.run_name
     output_dir.mkdir(parents=True, exist_ok=True)
     runs = _planned_model_runs(exp)

@@ -11,7 +11,7 @@ import plotly.graph_objects as go
 from IPython.display import Markdown, display
 
 from clusters_unmixing.config import ExperimentConfig
-from clusters_unmixing.dataio.clusters import load_wavelength_and_cluster_matrix
+from clusters_unmixing.dataio import load_wavelength_and_cluster_matrix
 from clusters_unmixing.pipelines import run_correlation_experiments
 from clusters_unmixing.transforms import apply_normalization, apply_transform, select_wavelength_ranges
 from clusters_unmixing.utils.diagnostics import (
