@@ -34,13 +34,6 @@ def _run_vpgdu(endmembers: torch.Tensor, pixels: torch.Tensor, params: dict[str,
 _MODEL_REGISTRY: dict[str, ModelRunner] = {"sunsal": _run_sunsal, "vpgdu": _run_vpgdu}
 
 
-def register_model(name: str, runner: ModelRunner, *, overwrite: bool = False) -> None:
-    key = name.strip().lower()
-    if not overwrite and key in _MODEL_REGISTRY:
-        raise ValueError(f"Model '{key}' is already registered")
-    _MODEL_REGISTRY[key] = runner
-
-
 def available_models() -> list[str]:
     return sorted(_MODEL_REGISTRY)
 

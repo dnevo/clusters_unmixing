@@ -10,52 +10,6 @@ from IPython.display import Markdown, display
 from clusters_unmixing.config import ExperimentConfig
 
 
-def _bands_key(raw_bands_ranges: list[Any]) -> str:
-    return json.dumps(raw_bands_ranges, separators=(",", ":"), ensure_ascii=False)
-
-
-def build_model_run_diagnostics(config_path: str | Path, correlation_summary_path: str | Path, model_summary_path: str | Path, abundance_preview_path: str | Path | None = None) -> list[dict[str, Any]]:
-    config = ExperimentConfig.from_file(config_path)
-    corr_df = pd.read_csv(correlation_summary_path) if Path(correlation_summary_path).exists() and Path(correlation_summary_path).stat().st_size else pd.DataFrame()
-    model_df = pd.read_csv(model_summary_path) if Path(model_summary_path).exists() and Path(model_summary_path).stat().st_size else pd.DataFrame()
-    abundance_df = pd.read_csv(abundance_preview_path) if abundance_preview_path and Path(abundance_preview_path).exists() and Path(abundance_preview_path).stat().st_size else pd.DataFrame()
-    model_eval = config.model_evaluation
-    runs = list(model_eval.runs)
-    payloads = []
-    for run_index, run in enumerate(runs, start=1):
-        bands_key = _bands_key(run.serialized_bands_ranges())
-        snr_db = run.resolved_snr_db()
-        comparison = model_df[
-            (model_df['cluster_set'] == run.cluster_set)
-            & (model_df['bands_ranges'] == bands_key)
-            & (model_df['normalization'] == run.normalized_normalization())
-            & (model_df['transform'] == run.normalized_transform())
-            & (model_df['snr_db'].astype(float) == float(snr_db))
-        ]
-        comparison_table = comparison.pivot(index='metric', columns='model', values='mean').sort_index() if not comparison.empty else pd.DataFrame()
-        corr_rows = corr_df[
-            (corr_df['run_index'] == run_index)
-            & (corr_df['cluster_set'] == run.cluster_set)
-            & (corr_df['normalization'] == run.normalized_normalization())
-            & (corr_df['transform'] == run.normalized_transform())
-        ]
-        metric_rows = corr_rows[['metric', 'mean_abs_offdiag', 'max_abs_offdiag', 'min_offdiag', 'max_offdiag']].to_dict(orient='records') if not corr_rows.empty else []
-        abundance_table = abundance_df[abundance_df['run_index'] == run_index].copy() if not abundance_df.empty else pd.DataFrame()
-        payloads.append({
-            'run_index': run_index,
-            'run_count': len(runs),
-            'cluster_set': run.cluster_set,
-            'normalization': run.normalized_normalization(),
-            'transform': run.normalized_transform(),
-            'snr_db': snr_db,
-            'comparison': comparison_table,
-            'abundance_table': abundance_table,
-            'models': run.normalized_models(),
-            'projection_group': {'metric_rows': metric_rows, 'bands_ranges': run.serialized_bands_ranges()},
-        })
-    return payloads
-
-
 def _resolve_abundance_columns(abundance_df: pd.DataFrame) -> tuple[list[str], list[str]]:
     true_cols = [c for c in abundance_df.columns if c.startswith('true_a') or c.startswith('true_abundance_')]
     pred_cols = [c for c in abundance_df.columns if c.startswith('est_a') or c.startswith('pred_abundance_')]
@@ -101,6 +55,8 @@ def display_abundance_comparison_tables(abundance_df: pd.DataFrame, max_pixels: 
     for item in tables:
         display(Markdown(f"### Abundances  |  pixel_index={item['pixel_index']}"))
         display(item['table'])
+
+        
 def plot_cluster_overview(
     wavelengths: Any,
     signatures: Any,
