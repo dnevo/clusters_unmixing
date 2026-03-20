@@ -3,11 +3,14 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from typing import Any
+
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 from IPython.display import Markdown, display
+
 from clusters_unmixing.config import ExperimentConfig
+from clusters_unmixing.config.schema import BandRangeSpec
 
 
 def _resolve_abundance_columns(abundance_df: pd.DataFrame) -> tuple[list[str], list[str]]:
@@ -56,12 +59,12 @@ def display_abundance_comparison_tables(abundance_df: pd.DataFrame, max_pixels: 
         display(Markdown(f"### Abundances  |  pixel_index={item['pixel_index']}"))
         display(item['table'])
 
-        
+
 def plot_cluster_overview(
     wavelength_axis: Any,
     endmembers: Any,
     title: str,
-    bands_ranges: list[Any] | None = None,
+    bands_ranges: list[BandRangeSpec] | None = None,
     y_title: str = "Reflectance",
 ) -> go.Figure:
     """Cluster-level spectra overview plot with styling by band-range type.
@@ -80,25 +83,6 @@ def plot_cluster_overview(
             f"wavelength/endmember length mismatch: {len(wavelength_axis_arr)} vs {endmembers_arr.shape[1]}"
         )
 
-    def _normalize_ranges(raw_ranges: list[Any] | None) -> list[tuple[float, float, str]]:
-        if not raw_ranges:
-            return []
-        normalized: list[tuple[float, float, str]] = []
-        for item in raw_ranges:
-            if isinstance(item, dict):
-                range_vals = item.get("range_µm") or item.get("range_um")
-                if range_vals is None or len(range_vals) != 2:
-                    raise ValueError("bands_ranges object entries must contain range_µm=[x_min, x_max]")
-                reduce = str(item.get("reduce", "none")).strip().lower()
-                normalized.append((float(range_vals[0]), float(range_vals[1]), reduce))
-            elif isinstance(item, (list, tuple)) and len(item) == 3:
-                normalized.append((float(item[0]), float(item[1]), str(item[2]).strip().lower()))
-            elif isinstance(item, (list, tuple)) and len(item) == 2:
-                normalized.append((float(item[0]), float(item[1]), "none"))
-            else:
-                raise ValueError("bands_ranges entries must be [x_min, x_max], [x_min, x_max, reduce], or object form")
-        return normalized
-
     def _segment_slices(mask: np.ndarray) -> list[slice]:
         idx = np.flatnonzero(mask)
         if idx.size == 0:
@@ -112,9 +96,8 @@ def plot_cluster_overview(
         stops.append(int(idx[-1]) + 1)
         return [slice(start, stop) for start, stop in zip(starts, stops)]
 
-    normalized_ranges = _normalize_ranges(bands_ranges)
     point_kind = np.full(len(wavelength_axis_arr), "outside", dtype=object)
-    for x_min, x_max, reduce in normalized_ranges:
+    for x_min, x_max, reduce in bands_ranges or []:
         mask = (wavelength_axis_arr >= float(x_min)) & (wavelength_axis_arr <= float(x_max))
         point_kind[mask] = "mean" if reduce == "mean" else "none"
 
@@ -146,7 +129,7 @@ def plot_cluster_overview(
                     legendgroup=cluster_name,
                     showlegend=not legend_shown,
                     line={"color": cluster_color, "dash": dash_style},
-                    hovertemplate="cluster=%{fullData.name}<br>wavelength=%{x:.3f} µm<br>value=%{y:.4f}<extra></extra>",
+                    hovertemplate="cluster=%{fullData.name}<br>wavelength=%{x:.3f} um<br>value=%{y:.4f}<extra></extra>",
                 ))
                 legend_shown = True
 
@@ -161,7 +144,7 @@ def plot_cluster_overview(
                         name=cluster_name,
                         legendgroup=cluster_name,
                         showlegend=False,
-                        hovertemplate="cluster=%{fullData.name}<br>wavelength=%{x:.3f} µm<br>value=%{y:.4f}<extra></extra>",
+                        hovertemplate="cluster=%{fullData.name}<br>wavelength=%{x:.3f} um<br>value=%{y:.4f}<extra></extra>",
                     ))
 
         if not legend_shown:
@@ -173,12 +156,12 @@ def plot_cluster_overview(
                 legendgroup=cluster_name,
                 showlegend=True,
                 line={"color": cluster_color},
-                hovertemplate="cluster=%{fullData.name}<br>wavelength=%{x:.3f} µm<br>value=%{y:.4f}<extra></extra>",
+                hovertemplate="cluster=%{fullData.name}<br>wavelength=%{x:.3f} um<br>value=%{y:.4f}<extra></extra>",
             ))
 
     fig.update_layout(
         title=title,
-        xaxis_title="Wavelength (µm)",
+        xaxis_title="Wavelength (um)",
         yaxis_title=y_title,
         height=480,
     )

@@ -183,15 +183,15 @@ def run_diagnostics_notebook(config_path: Path, project_root: Path) -> None:
         _, raw_endmembers_selected, _ = select_wavelength_ranges(
             wavelengths=wavelength_axis_full,
             endmembers=endmembers_full,
-            bands_ranges=run_cfg.serialized_bands_ranges(),
+            bands_ranges=bands_ranges,
         )
         stats_payload = {'raw': cosine_offdiag_stats(raw_endmembers_selected)}
 
-        normalized_endmembers_full = apply_normalization(endmembers_full, wavelength_axis_full, normalization)
+        normalized_endmembers_full, _ = apply_normalization(endmembers_full, endmembers_full, wavelength_axis_full, normalization)
         _, normalized_endmembers_selected, _ = select_wavelength_ranges(
             wavelengths=wavelength_axis_full,
             endmembers=normalized_endmembers_full,
-            bands_ranges=run_cfg.serialized_bands_ranges(),
+            bands_ranges=bands_ranges,
         )
         if normalization != 'without':
             stats_payload['normalized'] = cosine_offdiag_stats(normalized_endmembers_selected)
@@ -230,7 +230,7 @@ def run_diagnostics_notebook(config_path: Path, project_root: Path) -> None:
         display_abundance_comparison_tables(abundance_rows, max_pixels=5)
 
         display(Markdown('### Synthetic pixel spectra preview'))
-        endmembers_full_for_plot = apply_normalization(endmembers_full, wavelength_axis_full, normalization)
+        endmembers_full_for_plot, _ = apply_normalization(endmembers_full, endmembers_full, wavelength_axis_full, normalization)
         for pixel_index in sorted(abundance_rows['pixel_index'].astype(int).unique()):
             display(plot_pixel_preview(
                 pixel_index=pixel_index,

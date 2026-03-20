@@ -14,6 +14,7 @@ from clusters_unmixing.data import generate_samples
 from clusters_unmixing.dataio import load_wavelength_and_cluster_matrix
 from clusters_unmixing.metrics import compute_correlation_matrix, summarize_correlation_matrix
 from clusters_unmixing.models.runner_registry import run_registered_model
+from clusters_unmixing.transforms.normalization import apply_normalization
 from clusters_unmixing.transforms.spectral_views import apply_transform, select_wavelength_ranges
 
 
@@ -47,8 +48,8 @@ def _planned_model_runs(exp: ExperimentConfig) -> list[dict[str, Any]]:
     model_params = {model.normalized_name(): dict(model.params) for model in model_eval.models}
     runs = []
     for item in model_eval.runs:
-        bands_ranges = item.serialized_bands_ranges()
-        bands_ranges_key = json.dumps(bands_ranges, separators=(",", ":"), ensure_ascii=False)
+        bands_ranges = item.normalized_bands_ranges()
+        bands_ranges_key = json.dumps(item.serialized_bands_ranges(), separators=(",", ":"), ensure_ascii=False)
         runs.append({
             "cluster_set": item.cluster_set,
             "bands_ranges": bands_ranges,
@@ -62,15 +63,6 @@ def _planned_model_runs(exp: ExperimentConfig) -> list[dict[str, Any]]:
             "snr_db": item.resolved_snr_db(),
         })
     return runs
-
-
-def _apply_normalization(endmembers: np.ndarray, pixels: np.ndarray, wavelengths: np.ndarray, normalization: str) -> tuple[np.ndarray, np.ndarray]:
-    if normalization == "without":
-        return endmembers, pixels
-    if normalization == "with_quadratic":
-        q_values = -0.20 * wavelengths**2 + 0.68 * wavelengths - 0.12
-        return endmembers - q_values[None, :], pixels - q_values[None, :]
-    raise ValueError(f"Unsupported normalization mode: {normalization}")
 
 
 def _build_projection(
@@ -90,7 +82,7 @@ def _build_projection(
         run["bands_ranges"],
     )
 
-    projected_endmembers, projected_pixels = _apply_normalization(
+    projected_endmembers, projected_pixels = apply_normalization(
         selected_endmembers,
         selected_pixels,
         wavelengths_sel,
