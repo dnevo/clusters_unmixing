@@ -74,10 +74,10 @@ def plot_cluster_overview(
     wavelength_axis_arr = pd.Series(wavelength_axis, dtype=float).to_numpy()
     endmembers_arr = pd.DataFrame(endmembers).to_numpy(dtype=float)
     if endmembers_arr.ndim != 2:
-        raise ValueError("endmembers must be a 2D array of shape (bands, clusters)")
-    if endmembers_arr.shape[0] != len(wavelength_axis_arr):
+        raise ValueError("endmembers must be a 2D array of shape (clusters, bands)")
+    if endmembers_arr.shape[1] != len(wavelength_axis_arr):
         raise ValueError(
-            f"wavelength/endmember length mismatch: {len(wavelength_axis_arr)} vs {endmembers_arr.shape[0]}"
+            f"wavelength/endmember length mismatch: {len(wavelength_axis_arr)} vs {endmembers_arr.shape[1]}"
         )
 
     def _normalize_ranges(raw_ranges: list[Any] | None) -> list[tuple[float, float, str]]:
@@ -125,10 +125,10 @@ def plot_cluster_overview(
     ]
 
     fig = go.Figure()
-    for idx in range(endmembers_arr.shape[1]):
+    for idx in range(endmembers_arr.shape[0]):
         cluster_name = f"Cluster {idx + 1}"
         cluster_color = palette[idx % len(palette)]
-        y = endmembers_arr[:, idx]
+        y = endmembers_arr[idx]
         legend_shown = False
 
         for kind, dash_style in [("none", "solid"), ("mean", "dash"), ("outside", "dot")]:

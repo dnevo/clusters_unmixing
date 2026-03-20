@@ -44,7 +44,7 @@ def _cluster_path_map(cfg: ExperimentConfig, project_root: str | Path | None = N
 
 
 def cosine_matrix(endmembers: np.ndarray) -> np.ndarray:
-    matrix = np.asarray(endmembers, dtype=float).T
+    matrix = np.asarray(endmembers, dtype=float)
     norms = np.linalg.norm(matrix, axis=1, keepdims=True)
     norms[norms == 0] = 1.0
     normalized = matrix / norms
@@ -89,7 +89,7 @@ def plot_pixel_preview(
     a_true = abundance_vector(row_sunsal, 'true_a')
     a_sunsal = abundance_vector(row_sunsal, 'est_a')
     a_vpgdu = abundance_vector(row_vpgdu, 'est_a')
-    y_clean = np.asarray(endmembers_full @ a_true, dtype=float)
+    y_clean = np.asarray(a_true @ endmembers_full, dtype=float)
     if np.isinf(float(snr_db)):
         y_noisy = y_clean.copy()
     else:
@@ -98,8 +98,8 @@ def plot_pixel_preview(
         noise_std = signal_rms * float(10.0 ** (-float(snr_db) / 20.0))
         rng = np.random.default_rng(seed=int(pixel_index))
         y_noisy = y_clean + rng.normal(loc=0.0, scale=noise_std, size=y_clean.shape)
-    y_sunsal = np.asarray(endmembers_full @ a_sunsal, dtype=float)
-    y_vpgdu = np.asarray(endmembers_full @ a_vpgdu, dtype=float)
+    y_sunsal = np.asarray(a_sunsal @ endmembers_full, dtype=float)
+    y_vpgdu = np.asarray(a_vpgdu @ endmembers_full, dtype=float)
     fig = go.Figure()
     fig.add_scatter(x=wavelength_axis_full, y=y_clean, mode='lines', name='without_noise')
     fig.add_scatter(x=wavelength_axis_full, y=y_noisy, mode='lines', name='with_noise', line=dict(dash='dash'))
@@ -205,7 +205,7 @@ def run_diagnostics_notebook(config_path: Path, project_root: Path) -> None:
 
         transformed_endmembers = normalized_endmembers_selected
         for step_name, step_params in transform_steps:
-            transformed_endmembers = apply_transform(transformed_endmembers, kind=step_name, params=step_params)
+            transformed_endmembers, _ = apply_transform(transformed_endmembers, transformed_endmembers, kind=step_name, params=step_params)
             stats_payload[step_name] = cosine_offdiag_stats(transformed_endmembers)
 
         display(stats_table(stats_payload))

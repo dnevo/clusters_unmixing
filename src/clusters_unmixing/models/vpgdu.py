@@ -85,7 +85,7 @@ class VPGDU:
         self : VPGDU
             Solver instance.
         endmembers : torch.Tensor
-            Endmember matrix with shape ``(n_bands, n_endmembers)``.
+            Endmember matrix with shape ``(n_endmembers, n_bands)``.
 
         Returns
         -------
@@ -94,7 +94,7 @@ class VPGDU:
         """
 
         device = endmembers.device
-        _, n_endmembers = endmembers.shape
+        n_endmembers, _ = endmembers.shape
 
         alpha_list = []
         beta_list = []
@@ -124,11 +124,11 @@ class VPGDU:
                         abundance[j] = other[other_cursor]
                         other_cursor += 1
 
-                mixed = endmembers @ abundance
+                mixed = abundance @ endmembers
 
                 sam_values = torch.zeros(n_endmembers, device=device)
                 for inner_index in range(n_endmembers):
-                    em = endmembers[:, inner_index]
+                    em = endmembers[inner_index]
                     denominator = torch.norm(em) * torch.norm(mixed) + 1e-9
                     cosine = torch.dot(em, mixed) / denominator
                     cosine = torch.clamp(cosine, -1.0, 1.0)
@@ -162,7 +162,7 @@ class VPGDU:
         pixels : torch.Tensor
             Pixel matrix with shape ``(n_pixels, n_bands)``.
         endmembers : torch.Tensor
-            Endmember matrix with shape ``(n_bands, n_endmembers)``.
+            Endmember matrix with shape ``(n_endmembers, n_bands)``.
         alpha : torch.Tensor
             Per-endmember linear coefficient for normalized SAM values.
         beta : torch.Tensor
@@ -174,9 +174,9 @@ class VPGDU:
             Initial abundance matrix with shape ``(n_pixels, n_endmembers)``.
         """
 
-        dot_products = pixels @ endmembers
+        dot_products = pixels @ endmembers.T
         norm_pixels = torch.norm(pixels, dim=1, keepdim=True)
-        norm_endmembers = torch.norm(endmembers, dim=0, keepdim=True)
+        norm_endmembers = torch.norm(endmembers, dim=1, keepdim=True).T
 
         denominators = norm_pixels @ norm_endmembers
         cosines = dot_products / (denominators + 1e-9)
@@ -204,7 +204,7 @@ class VPGDU:
         self : VPGDU
             Solver instance.
         endmembers : torch.Tensor
-            Endmember matrix with shape ``(n_bands, n_endmembers)``.
+            Endmember matrix with shape ``(n_endmembers, n_bands)``.
         pixels : torch.Tensor
             Pixel matrix with shape ``(n_pixels, n_bands)``.
 
@@ -216,38 +216,38 @@ class VPGDU:
 
         self.endmembers = endmembers
         self.device = endmembers.device
-        _, n_endmembers = endmembers.shape
+        n_endmembers, _ = endmembers.shape
 
         alpha, beta = self._preprocess_initial_estimator(endmembers)
         abundance_init = self._get_initial_abundance_estimates(pixels, endmembers, alpha, beta)
 
         n_pixels, _ = pixels.shape
 
-        measurements = pixels.T
+        measurements = pixels
         abundance_hat = abundance_init.T
 
         active_mask = torch.ones(n_pixels, dtype=torch.bool, device=self.device)
         pixel_indices = torch.arange(n_pixels, device=self.device)
         abundance_prev = abundance_hat.clone()
-        endmembers_t_endmembers = self.endmembers.T @ self.endmembers
+        endmembers_t_endmembers = self.endmembers @ self.endmembers.T
 
         for iteration in range(self.cfg.max_iters):
-            measurements_active = measurements[:, active_mask]
+            measurements_active = measurements[active_mask]
             abundance_active = abundance_hat[:, active_mask]
 
-            if measurements_active.shape[1] == 0:
+            if measurements_active.shape[0] == 0:
                 if self.cfg.verbose:
                     print(f"All pixels converged at iteration {iteration}")
                 break
 
-            grad_1 = self.endmembers.T @ measurements_active
-            endmembers_times_abundance = self.endmembers @ abundance_active
-            sum_sq = torch.sum(endmembers_times_abundance * endmembers_times_abundance, dim=0, keepdim=True)
+            grad_1 = self.endmembers @ measurements_active.T
+            endmembers_times_abundance = abundance_active.T @ self.endmembers
+            sum_sq = torch.sum(endmembers_times_abundance * endmembers_times_abundance, dim=1, keepdim=True).T
             grad_2 = sum_sq.expand(n_endmembers, -1)
             grad_3 = endmembers_t_endmembers @ abundance_active
-            dot_m_ef = torch.sum(measurements_active * endmembers_times_abundance, dim=0, keepdim=True)
+            dot_m_ef = torch.sum(measurements_active * endmembers_times_abundance, dim=1, keepdim=True).T
             grad_4 = dot_m_ef.expand(n_endmembers, -1)
-            norm_m = torch.sqrt(torch.sum(measurements_active * measurements_active, dim=0, keepdim=True))
+            norm_m = torch.sqrt(torch.sum(measurements_active * measurements_active, dim=1, keepdim=True)).T
             grad_5 = norm_m.expand(n_endmembers, -1)
             grad_n = grad_1 * grad_2 - grad_3 * grad_4
             grad_d = grad_5 * (grad_2.pow(1.5))
@@ -293,7 +293,7 @@ class VPGDU:
         self : VPGDU
             Solver instance.
         endmembers : torch.Tensor
-            Endmember matrix with shape ``(n_bands, n_endmembers)``.
+            Endmember matrix with shape ``(n_endmembers, n_bands)``.
         pixels : torch.Tensor
             Pixel matrix with shape ``(n_pixels, n_bands)``.
 

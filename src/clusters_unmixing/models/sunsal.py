@@ -106,7 +106,7 @@ class SunSAL:
         self : SunSAL
             Solver instance.
         endmembers : torch.Tensor
-            Endmember matrix with shape ``(n_bands, n_endmembers)``.
+            Endmember matrix with shape ``(n_endmembers, n_bands)``.
         pixels : torch.Tensor
             Pixel matrix with shape ``(n_pixels, n_bands)``.
         x0 : Optional[torch.Tensor], optional
@@ -124,7 +124,7 @@ class SunSAL:
         dtype = endmembers.dtype
 
         measurements = ensure_2d(pixels).to(device=device, dtype=dtype)
-        bands, n_endmembers = endmembers.shape
+        n_endmembers, bands = endmembers.shape
         n_pixels = measurements.shape[0]
 
         if measurements.shape[1] != bands:
@@ -152,8 +152,8 @@ class SunSAL:
         u = x.clone()
         d = torch.zeros_like(x)
 
-        at = endmembers.T
-        b = at @ endmembers + cfg.mu * torch.eye(n_endmembers, device=device, dtype=dtype)
+        at = endmembers
+        b = at @ endmembers.T + cfg.mu * torch.eye(n_endmembers, device=device, dtype=dtype)
 
         chol_ok = True
         try:
@@ -233,7 +233,7 @@ class SunSAL:
         self : SunSAL
             Solver instance.
         endmembers : torch.Tensor
-            Endmember matrix with shape ``(n_bands, n_endmembers)``.
+            Endmember matrix with shape ``(n_endmembers, n_bands)``.
         pixels : torch.Tensor
             Pixel matrix with shape ``(n_pixels, n_bands)``.
         x0 : Optional[torch.Tensor], optional

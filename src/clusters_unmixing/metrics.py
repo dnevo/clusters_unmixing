@@ -4,10 +4,10 @@ import numpy as np
 
 
 def _cosine_similarity_matrix(endmembers: np.ndarray) -> np.ndarray:
-    norms = np.linalg.norm(endmembers, axis=0, keepdims=True)
+    norms = np.linalg.norm(endmembers, axis=1, keepdims=True)
     norms = np.clip(norms, 1e-12, None)
     normalized = endmembers / norms
-    return normalized.T @ normalized
+    return normalized @ normalized.T
 
 
 def compute_correlation_matrix(endmembers: np.ndarray, metric: str = "cosine") -> np.ndarray:

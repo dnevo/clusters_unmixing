@@ -64,12 +64,12 @@ def _planned_model_runs(exp: ExperimentConfig) -> list[dict[str, Any]]:
     return runs
 
 
-def _apply_normalization(endmembers: np.ndarray, wavelengths: np.ndarray, normalization: str) -> np.ndarray:
+def _apply_normalization(endmembers: np.ndarray, pixels: np.ndarray, wavelengths: np.ndarray, normalization: str) -> tuple[np.ndarray, np.ndarray]:
     if normalization == "without":
-        return endmembers
+        return endmembers, pixels
     if normalization == "with_quadratic":
         q_values = -0.20 * wavelengths**2 + 0.68 * wavelengths - 0.12
-        return endmembers - q_values[:, None]
+        return endmembers - q_values[None, :], pixels - q_values[None, :]
     raise ValueError(f"Unsupported normalization mode: {normalization}")
 
 
@@ -86,25 +86,19 @@ def _build_projection(
     )
     _, selected_pixels, _ = select_wavelength_ranges(
         wavelengths,
-        raw_pixels.T,
+        raw_pixels,
         run["bands_ranges"],
     )
-    selected_pixels = selected_pixels.T
 
-    projected_endmembers = _apply_normalization(
+    projected_endmembers, projected_pixels = _apply_normalization(
         selected_endmembers,
+        selected_pixels,
         wavelengths_sel,
         run["normalization"],
     )
-    projected_pixels = _apply_normalization(
-        selected_pixels.T,
-        wavelengths_sel,
-        run["normalization"],
-    ).T
 
     for name, params in run["transform_steps"]:
-        projected_endmembers = apply_transform(projected_endmembers, name, params)
-        projected_pixels = apply_transform(projected_pixels.T, name, params).T
+        projected_endmembers, projected_pixels = apply_transform(projected_endmembers, projected_pixels, name, params)
 
     return projected_endmembers, projected_pixels
 
@@ -116,14 +110,14 @@ def _set_global_seeds(seed: int) -> None:
 
 
 def _make_synthetic_pixels(endmembers: np.ndarray, num_pixels: int, snr_db: float) -> tuple[np.ndarray, np.ndarray]:
-    n_endmembers = int(endmembers.shape[1])
+    n_endmembers = int(endmembers.shape[0])
     raw_endmembers = torch.as_tensor(endmembers, dtype=torch.float32)
     abundances = generate_samples(
         num_samples=num_pixels,
         max_non_zero_endmembers=n_endmembers,
         num_endmembers=n_endmembers,
     )
-    clean_pixels = abundances @ raw_endmembers.T
+    clean_pixels = abundances @ raw_endmembers
     if np.isinf(snr_db):
         return clean_pixels.detach().cpu().numpy(), abundances.detach().cpu().numpy()
     signal_power = float(clean_pixels.pow(2).mean().item())
