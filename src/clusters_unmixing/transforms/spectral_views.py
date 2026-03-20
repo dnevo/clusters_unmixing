@@ -5,27 +5,27 @@ from typing import Any
 import numpy as np
 
 
-def first_derivative(signatures: np.ndarray) -> np.ndarray:
-    return np.gradient(signatures, axis=0)
+def first_derivative(endmembers: np.ndarray) -> np.ndarray:
+    return np.gradient(endmembers, axis=0)
 
 
-def pca_reduce(signatures: np.ndarray, n_components: int) -> np.ndarray:
-    n_bands, n_members = signatures.shape
+def pca_reduce(endmembers: np.ndarray, n_components: int) -> np.ndarray:
+    n_bands, n_members = endmembers.shape
     if n_components > n_members:
         raise ValueError("PCA 'n_components' cannot exceed number of endmembers")
-    centered = signatures - signatures.mean(axis=1, keepdims=True)
+    centered = endmembers - endmembers.mean(axis=1, keepdims=True)
     u, s, _ = np.linalg.svd(centered, full_matrices=False)
     basis = u[:, :n_components]
     return basis.T @ centered
 
 
-def apply_transform(signatures: np.ndarray, kind: str, params: dict[str, Any] | None = None) -> np.ndarray:
+def apply_transform(endmembers: np.ndarray, kind: str, params: dict[str, Any] | None = None) -> np.ndarray:
     params = {} if params is None else dict(params)
     kind = kind.strip().lower()
     if kind == "first_derivative":
-        return first_derivative(signatures)
+        return first_derivative(endmembers)
     if kind == "pca":
-        return pca_reduce(signatures, n_components=params.get("n_components"))
+        return pca_reduce(endmembers, n_components=params.get("n_components"))
     raise ValueError(f"Unsupported transform kind: {kind}")
 
 
@@ -47,14 +47,14 @@ def _normalize_bands_ranges(bands_ranges: list[Any]) -> list[tuple[float, float,
     return normalized
 
 
-def select_wavelength_ranges(wavelengths: np.ndarray, signatures: np.ndarray, bands_ranges: list[Any]) -> tuple[np.ndarray, np.ndarray, list[int]]:
+def select_wavelength_ranges(wavelengths: np.ndarray, endmembers: np.ndarray, bands_ranges: list[Any]) -> tuple[np.ndarray, np.ndarray, list[int]]:
     pieces_w = []
     pieces_s = []
     segment_lengths = []
     for x_min, x_max, reduce in _normalize_bands_ranges(bands_ranges):
         mask = (wavelengths >= x_min) & (wavelengths <= x_max)
         w = wavelengths[mask]
-        s = signatures[mask]
+        s = endmembers[mask]
         if w.size == 0:
             raise ValueError(f"No wavelengths found in range [{x_min}, {x_max}]")
         if reduce == "mean":

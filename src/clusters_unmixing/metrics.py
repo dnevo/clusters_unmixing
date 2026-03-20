@@ -3,19 +3,19 @@ from __future__ import annotations
 import numpy as np
 
 
-def _cosine_similarity_matrix(signatures: np.ndarray) -> np.ndarray:
-    norms = np.linalg.norm(signatures, axis=0, keepdims=True)
+def _cosine_similarity_matrix(endmembers: np.ndarray) -> np.ndarray:
+    norms = np.linalg.norm(endmembers, axis=0, keepdims=True)
     norms = np.clip(norms, 1e-12, None)
-    normalized = signatures / norms
+    normalized = endmembers / norms
     return normalized.T @ normalized
 
 
-def compute_correlation_matrix(signatures: np.ndarray, metric: str = "cosine") -> np.ndarray:
+def compute_correlation_matrix(endmembers: np.ndarray, metric: str = "cosine") -> np.ndarray:
     metric = metric.strip().lower()
     if metric == "cosine":
-        return _cosine_similarity_matrix(signatures)
+        return _cosine_similarity_matrix(endmembers)
     if metric == "sam":
-        cosine = _cosine_similarity_matrix(signatures)
+        cosine = _cosine_similarity_matrix(endmembers)
         return np.degrees(np.arccos(np.clip(cosine, -1.0, 1.0)))
     raise ValueError(f"Unsupported correlation metric: {metric}")
 

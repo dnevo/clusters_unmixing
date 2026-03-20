@@ -64,12 +64,12 @@ def _planned_model_runs(exp: ExperimentConfig) -> list[dict[str, Any]]:
     return runs
 
 
-def _apply_normalization(signatures: np.ndarray, wavelengths: np.ndarray, normalization: str) -> np.ndarray:
+def _apply_normalization(endmembers: np.ndarray, wavelengths: np.ndarray, normalization: str) -> np.ndarray:
     if normalization == "without":
-        return signatures
+        return endmembers
     if normalization == "with_quadratic":
         q_values = -0.20 * wavelengths**2 + 0.68 * wavelengths - 0.12
-        return signatures - q_values[:, None]
+        return endmembers - q_values[:, None]
     raise ValueError(f"Unsupported normalization mode: {normalization}")
 
 

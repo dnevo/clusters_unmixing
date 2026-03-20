@@ -43,16 +43,16 @@ def _cluster_path_map(cfg: ExperimentConfig, project_root: str | Path | None = N
     return {item.name: (config_dir / item.path).resolve() for item in cfg.cluster_sets}
 
 
-def cosine_matrix(signatures: np.ndarray) -> np.ndarray:
-    matrix = np.asarray(signatures, dtype=float).T
+def cosine_matrix(endmembers: np.ndarray) -> np.ndarray:
+    matrix = np.asarray(endmembers, dtype=float).T
     norms = np.linalg.norm(matrix, axis=1, keepdims=True)
     norms[norms == 0] = 1.0
     normalized = matrix / norms
     return normalized @ normalized.T
 
 
-def cosine_offdiag_stats(signatures: np.ndarray) -> dict[str, float]:
-    cosine = cosine_matrix(signatures)
+def cosine_offdiag_stats(endmembers: np.ndarray) -> dict[str, float]:
+    cosine = cosine_matrix(endmembers)
     mask = ~np.eye(cosine.shape[0], dtype=bool)
     offdiag = cosine[mask]
     return {
@@ -79,7 +79,7 @@ def abundance_vector(row: pd.Series, prefix: str) -> np.ndarray:
 
 def plot_pixel_preview(
     pixel_index: int,
-    wavelengths_full: np.ndarray,
+    wavelength_axis_full: np.ndarray,
     endmembers_full: np.ndarray,
     abundance_rows: pd.DataFrame,
     snr_db: float,
@@ -101,10 +101,10 @@ def plot_pixel_preview(
     y_sunsal = np.asarray(endmembers_full @ a_sunsal, dtype=float)
     y_vpgdu = np.asarray(endmembers_full @ a_vpgdu, dtype=float)
     fig = go.Figure()
-    fig.add_scatter(x=wavelengths_full, y=y_clean, mode='lines', name='without_noise')
-    fig.add_scatter(x=wavelengths_full, y=y_noisy, mode='lines', name='with_noise', line=dict(dash='dash'))
-    fig.add_scatter(x=wavelengths_full, y=y_sunsal, mode='lines', name='sunsal')
-    fig.add_scatter(x=wavelengths_full, y=y_vpgdu, mode='lines', name='vpgdu')
+    fig.add_scatter(x=wavelength_axis_full, y=y_clean, mode='lines', name='without_noise')
+    fig.add_scatter(x=wavelength_axis_full, y=y_noisy, mode='lines', name='with_noise', line=dict(dash='dash'))
+    fig.add_scatter(x=wavelength_axis_full, y=y_sunsal, mode='lines', name='sunsal')
+    fig.add_scatter(x=wavelength_axis_full, y=y_vpgdu, mode='lines', name='vpgdu')
     fig.update_layout(
         title=f'Reflectance by source | pixel_index={pixel_index}',
         xaxis_title='Wavelength (Âµm)',
@@ -170,43 +170,43 @@ def run_diagnostics_notebook(config_path: Path, project_root: Path) -> None:
         display(config_view)
 
         cluster_path = cluster_paths[cluster_set]
-        wavelengths_full, signatures_full = load_wavelength_and_cluster_matrix(cluster_path)
+        wavelength_axis_full, endmembers_full = load_wavelength_and_cluster_matrix(cluster_path)
 
         display(plot_cluster_overview(
-            wavelengths=wavelengths_full,
-            signatures=signatures_full,
+            wavelength_axis=wavelength_axis_full,
+            endmembers=endmembers_full,
             title=f'Raw clusters | set={cluster_set}',
             bands_ranges=bands_ranges,
             y_title='Reflectance',
         ))
 
-        _, raw_selected, _ = select_wavelength_ranges(
-            wavelengths=wavelengths_full,
-            signatures=signatures_full,
+        _, raw_endmembers_selected, _ = select_wavelength_ranges(
+            wavelengths=wavelength_axis_full,
+            endmembers=endmembers_full,
             bands_ranges=run_cfg.serialized_bands_ranges(),
         )
-        stats_payload = {'raw': cosine_offdiag_stats(raw_selected)}
+        stats_payload = {'raw': cosine_offdiag_stats(raw_endmembers_selected)}
 
-        normalized_full = apply_normalization(signatures_full, wavelengths_full, normalization)
-        _, normalized_selected, _ = select_wavelength_ranges(
-            wavelengths=wavelengths_full,
-            signatures=normalized_full,
+        normalized_endmembers_full = apply_normalization(endmembers_full, wavelength_axis_full, normalization)
+        _, normalized_endmembers_selected, _ = select_wavelength_ranges(
+            wavelengths=wavelength_axis_full,
+            endmembers=normalized_endmembers_full,
             bands_ranges=run_cfg.serialized_bands_ranges(),
         )
         if normalization != 'without':
-            stats_payload['normalized'] = cosine_offdiag_stats(normalized_selected)
+            stats_payload['normalized'] = cosine_offdiag_stats(normalized_endmembers_selected)
             display(plot_cluster_overview(
-                wavelengths=wavelengths_full,
-                signatures=normalized_full,
+                wavelength_axis=wavelength_axis_full,
+                endmembers=normalized_endmembers_full,
                 title=f'Normalized spectra | {cluster_set} | {normalization}',
                 y_title='Value',
                 bands_ranges=bands_ranges,
             ))
 
-        transformed = normalized_selected
+        transformed_endmembers = normalized_endmembers_selected
         for step_name, step_params in transform_steps:
-            transformed = apply_transform(transformed, kind=step_name, params=step_params)
-            stats_payload[step_name] = cosine_offdiag_stats(transformed)
+            transformed_endmembers = apply_transform(transformed_endmembers, kind=step_name, params=step_params)
+            stats_payload[step_name] = cosine_offdiag_stats(transformed_endmembers)
 
         display(stats_table(stats_payload))
 
@@ -230,11 +230,11 @@ def run_diagnostics_notebook(config_path: Path, project_root: Path) -> None:
         display_abundance_comparison_tables(abundance_rows, max_pixels=5)
 
         display(Markdown('### Synthetic pixel spectra preview'))
-        endmembers_full_for_plot = apply_normalization(signatures_full, wavelengths_full, normalization)
+        endmembers_full_for_plot = apply_normalization(endmembers_full, wavelength_axis_full, normalization)
         for pixel_index in sorted(abundance_rows['pixel_index'].astype(int).unique()):
             display(plot_pixel_preview(
                 pixel_index=pixel_index,
-                wavelengths_full=wavelengths_full,
+                wavelength_axis_full=wavelength_axis_full,
                 endmembers_full=endmembers_full_for_plot,
                 abundance_rows=abundance_rows,
                 snr_db=snr_db,

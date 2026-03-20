@@ -58,8 +58,8 @@ def display_abundance_comparison_tables(abundance_df: pd.DataFrame, max_pixels: 
 
         
 def plot_cluster_overview(
-    wavelengths: Any,
-    signatures: Any,
+    wavelength_axis: Any,
+    endmembers: Any,
     title: str,
     bands_ranges: list[Any] | None = None,
     y_title: str = "Reflectance",
@@ -71,13 +71,13 @@ def plot_cluster_overview(
     - ranges in config with reduce="mean" -> dashed line + diamond marker at segment midpoint
     - wavelengths outside configured ranges -> dotted line
     """
-    wavelengths_arr = pd.Series(wavelengths, dtype=float).to_numpy()
-    signatures_arr = pd.DataFrame(signatures).to_numpy(dtype=float)
-    if signatures_arr.ndim != 2:
-        raise ValueError("signatures must be a 2D array of shape (bands, clusters)")
-    if signatures_arr.shape[0] != len(wavelengths_arr):
+    wavelength_axis_arr = pd.Series(wavelength_axis, dtype=float).to_numpy()
+    endmembers_arr = pd.DataFrame(endmembers).to_numpy(dtype=float)
+    if endmembers_arr.ndim != 2:
+        raise ValueError("endmembers must be a 2D array of shape (bands, clusters)")
+    if endmembers_arr.shape[0] != len(wavelength_axis_arr):
         raise ValueError(
-            f"wavelength/signature length mismatch: {len(wavelengths_arr)} vs {signatures_arr.shape[0]}"
+            f"wavelength/endmember length mismatch: {len(wavelength_axis_arr)} vs {endmembers_arr.shape[0]}"
         )
 
     def _normalize_ranges(raw_ranges: list[Any] | None) -> list[tuple[float, float, str]]:
@@ -113,9 +113,9 @@ def plot_cluster_overview(
         return [slice(start, stop) for start, stop in zip(starts, stops)]
 
     normalized_ranges = _normalize_ranges(bands_ranges)
-    point_kind = np.full(len(wavelengths_arr), "outside", dtype=object)
+    point_kind = np.full(len(wavelength_axis_arr), "outside", dtype=object)
     for x_min, x_max, reduce in normalized_ranges:
-        mask = (wavelengths_arr >= float(x_min)) & (wavelengths_arr <= float(x_max))
+        mask = (wavelength_axis_arr >= float(x_min)) & (wavelength_axis_arr <= float(x_max))
         point_kind[mask] = "mean" if reduce == "mean" else "none"
 
     palette = [
@@ -125,16 +125,16 @@ def plot_cluster_overview(
     ]
 
     fig = go.Figure()
-    for idx in range(signatures_arr.shape[1]):
+    for idx in range(endmembers_arr.shape[1]):
         cluster_name = f"Cluster {idx + 1}"
         cluster_color = palette[idx % len(palette)]
-        y = signatures_arr[:, idx]
+        y = endmembers_arr[:, idx]
         legend_shown = False
 
         for kind, dash_style in [("none", "solid"), ("mean", "dash"), ("outside", "dot")]:
             kind_mask = point_kind == kind
             for seg in _segment_slices(kind_mask):
-                x_seg = wavelengths_arr[seg]
+                x_seg = wavelength_axis_arr[seg]
                 y_seg = y[seg]
                 if len(x_seg) == 0:
                     continue
@@ -166,7 +166,7 @@ def plot_cluster_overview(
 
         if not legend_shown:
             fig.add_trace(go.Scatter(
-                x=wavelengths_arr,
+                x=wavelength_axis_arr,
                 y=y,
                 mode="lines",
                 name=cluster_name,

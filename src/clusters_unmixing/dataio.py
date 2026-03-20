@@ -16,6 +16,6 @@ def load_wavelength_and_cluster_matrix(csv_path: str | PathLike[str]) -> tuple[n
     cluster_cols = [col for col in columns[1:] if str(col).lower().startswith("cluster")]
     if not cluster_cols:
         cluster_cols = columns[1:]
-    wavelengths = np.asarray(data[wavelength_col], dtype=float)
-    clusters = np.column_stack([np.asarray(data[col], dtype=float) for col in cluster_cols])
-    return wavelengths, clusters
+    wavelength_axis = np.asarray(data[wavelength_col], dtype=float)
+    endmembers = np.column_stack([np.asarray(data[col], dtype=float) for col in cluster_cols])
+    return wavelength_axis, endmembers
