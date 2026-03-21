@@ -14,8 +14,8 @@ from clusters_unmixing.config.schema import BandRangeSpec
 
 
 def _resolve_abundance_columns(abundance_df: pd.DataFrame) -> tuple[list[str], list[str]]:
-    true_cols = [c for c in abundance_df.columns if c.startswith('true_a') or c.startswith('true_abundance_')]
-    pred_cols = [c for c in abundance_df.columns if c.startswith('est_a') or c.startswith('pred_abundance_')]
+    true_cols = [c for c in abundance_df.columns if c.startswith('true_a')]
+    pred_cols = [c for c in abundance_df.columns if c.startswith('est_a')]
     true_cols = sorted(true_cols, key=lambda c: int(''.join(ch for ch in c if ch.isdigit()) or 0))
     pred_cols = sorted(pred_cols, key=lambda c: int(''.join(ch for ch in c if ch.isdigit()) or 0))
     return true_cols, pred_cols
@@ -112,7 +112,6 @@ def plot_cluster_overview(
         cluster_name = f"Cluster {idx + 1}"
         cluster_color = palette[idx % len(palette)]
         y = endmembers_arr[idx]
-        legend_shown = False
 
         for kind, dash_style in [("none", "solid"), ("mean", "dash"), ("outside", "dot")]:
             kind_mask = point_kind == kind
@@ -127,11 +126,10 @@ def plot_cluster_overview(
                     mode="lines",
                     name=cluster_name,
                     legendgroup=cluster_name,
-                    showlegend=not legend_shown,
+                    showlegend=False,
                     line={"color": cluster_color, "dash": dash_style},
                     hovertemplate="cluster=%{fullData.name}<br>wavelength=%{x:.3f} um<br>value=%{y:.4f}<extra></extra>",
                 ))
-                legend_shown = True
 
                 if kind == "mean":
                     mid_x = float((x_seg[0] + x_seg[-1]) / 2.0)
@@ -146,18 +144,6 @@ def plot_cluster_overview(
                         showlegend=False,
                         hovertemplate="cluster=%{fullData.name}<br>wavelength=%{x:.3f} um<br>value=%{y:.4f}<extra></extra>",
                     ))
-
-        if not legend_shown:
-            fig.add_trace(go.Scatter(
-                x=wavelength_axis_arr,
-                y=y,
-                mode="lines",
-                name=cluster_name,
-                legendgroup=cluster_name,
-                showlegend=True,
-                line={"color": cluster_color},
-                hovertemplate="cluster=%{fullData.name}<br>wavelength=%{x:.3f} um<br>value=%{y:.4f}<extra></extra>",
-            ))
 
     fig.update_layout(
         title=title,

@@ -42,9 +42,6 @@ def pca_reduce(
     pixels_t = x_c @ basis
     endmembers_t = (endmembers - mean) @ basis
 
-    var = (s[:n_components] ** 2 / (s ** 2).sum()).sum()
-    print(f"[SVD] {n_components} components -> {var:.1%} variance explained")
-
     return endmembers_t, pixels_t
 
 
@@ -57,11 +54,9 @@ def apply_transform(endmembers: np.ndarray, pixels: np.ndarray, kind: str, param
         return pca_reduce(endmembers, pixels, n_components=int(params["n_components"]))
     raise ValueError(f"Unsupported transform kind: {kind}")
 
-
-def select_wavelength_ranges(wavelengths: np.ndarray, endmembers: np.ndarray, bands_ranges: list[BandRangeSpec]) -> tuple[np.ndarray, np.ndarray, list[int]]:
+def select_wavelength_ranges(wavelengths: np.ndarray, endmembers: np.ndarray, bands_ranges: list[BandRangeSpec]) -> tuple[np.ndarray, np.ndarray]:
     pieces_w = []
     pieces_s = []
-    segment_lengths = []
     for x_min, x_max, reduce in bands_ranges:
         mask = (wavelengths >= x_min) & (wavelengths <= x_max)
         w = wavelengths[mask]
@@ -71,9 +66,7 @@ def select_wavelength_ranges(wavelengths: np.ndarray, endmembers: np.ndarray, ba
         if reduce == "mean":
             pieces_w.append(np.asarray([w.mean()], dtype=float))
             pieces_s.append(np.asarray(s.mean(axis=1, keepdims=True), dtype=float))
-            segment_lengths.append(1)
         else:
             pieces_w.append(w)
             pieces_s.append(s)
-            segment_lengths.append(int(w.shape[0]))
-    return np.concatenate(pieces_w), np.concatenate(pieces_s, axis=1), segment_lengths
+    return np.concatenate(pieces_w), np.concatenate(pieces_s, axis=1)

@@ -39,10 +39,7 @@ class ModelSpecConfig(BaseModel):
     params: dict[str, Any] = Field(default_factory=dict)
 
     def normalized_name(self) -> str:
-        name = self.name.strip().lower()
-        if not name:
-            raise ValueError("Model entry requires non-empty 'name'")
-        return name
+            return self.name.strip().lower()
 
     @classmethod
     def from_raw(cls, raw: Any) -> "ModelSpecConfig":
@@ -173,20 +170,21 @@ class ModelRunConfig(BaseModel):
                 labels.append(f"pca(n_components={int(params['n_components'])})")
         return "+".join(labels)
 
-    def normalized_normalization(self) -> str:
-        value = self.normalization.strip().lower()
-        if value not in {"without", "with_quadratic"}:
+    @field_validator("normalization")
+    @classmethod
+    def _validate_normalization(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if normalized not in {"without", "with_quadratic"}:
             raise ValueError("Model run 'normalization' must be one of: without, with_quadratic")
-        return value
+        return normalized
+
+    def normalized_normalization(self) -> str:
+        return self.normalization
 
     def resolved_num_pixels(self) -> int:
-        value = int(self.num_pixels)
-        if value <= 0:
-            raise ValueError("Model run 'num_pixels' must be > 0")
-        return value
-
-    def resolved_snr_db(self) -> float:
-        return float(self.snr_db)
+            if self.num_pixels <= 0:
+                raise ValueError("Model run 'num_pixels' must be > 0")
+            return self.num_pixels
 
     def projection_name(self) -> str:
         return _projection_name(self.normalized_bands_ranges(), self.normalized_transform(), self.normalized_normalization())

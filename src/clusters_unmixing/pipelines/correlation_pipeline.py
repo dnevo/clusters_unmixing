@@ -60,10 +60,9 @@ def _planned_model_runs(exp: ExperimentConfig) -> list[dict[str, Any]]:
             "projection": item.projection_name(),
             "models": [{"name": name, "params": dict(model_params[name])} for name in item.normalized_models()],
             "num_pixels": item.resolved_num_pixels(),
-            "snr_db": item.resolved_snr_db(),
+            "snr_db": item.snr_db,
         })
     return runs
-
 
 def _build_projection(
     run: dict[str, Any],
@@ -71,17 +70,16 @@ def _build_projection(
     raw_endmembers: np.ndarray,
     raw_pixels: np.ndarray,
 ) -> tuple[np.ndarray, np.ndarray]:
-    wavelengths_sel, selected_endmembers, mask = select_wavelength_ranges(
+    wavelengths_sel, selected_endmembers = select_wavelength_ranges(
         wavelengths,
         raw_endmembers,
         run["bands_ranges"],
     )
-    _, selected_pixels, _ = select_wavelength_ranges(
+    _, selected_pixels = select_wavelength_ranges(
         wavelengths,
         raw_pixels,
         run["bands_ranges"],
     )
-
     projected_endmembers, projected_pixels = apply_normalization(
         selected_endmembers,
         selected_pixels,
@@ -93,7 +91,6 @@ def _build_projection(
         projected_endmembers, projected_pixels = apply_transform(projected_endmembers, projected_pixels, name, params)
 
     return projected_endmembers, projected_pixels
-
 
 def _set_global_seeds(seed: int) -> None:
     random.seed(seed)
@@ -225,7 +222,8 @@ def run_correlation_experiments(exp: ExperimentConfig) -> dict[str, Any]:
                 abundance_preview_rows.append(row)
 
     summary_path = output_dir / 'correlation_summary.csv'
-    model_dir = output_dir / 'model_evaluation'
+    model_dir = output_dir / exp.model_evaluation.output_subdir
+
     model_dir.mkdir(parents=True, exist_ok=True)
     model_summary_path = model_dir / 'model_summary.csv'
     abundance_preview_path = model_dir / 'abundance_preview.csv'
@@ -243,6 +241,3 @@ def run_correlation_experiments(exp: ExperimentConfig) -> dict[str, Any]:
             'abundance_preview_path': str(abundance_preview_path),
         },
     }
-
-
-

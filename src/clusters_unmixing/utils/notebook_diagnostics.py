@@ -11,6 +11,7 @@ import plotly.graph_objects as go
 from IPython.display import Markdown, display
 
 from clusters_unmixing.config import ExperimentConfig
+from clusters_unmixing.metrics import compute_correlation_matrix, summarize_correlation_matrix
 from clusters_unmixing.dataio import load_wavelength_and_cluster_matrix
 from clusters_unmixing.pipelines import run_correlation_experiments
 from clusters_unmixing.transforms import apply_normalization, apply_transform, select_wavelength_ranges
@@ -43,24 +44,9 @@ def _cluster_path_map(cfg: ExperimentConfig, project_root: str | Path | None = N
     return {item.name: (config_dir / item.path).resolve() for item in cfg.cluster_sets}
 
 
-def cosine_matrix(endmembers: np.ndarray) -> np.ndarray:
-    matrix = np.asarray(endmembers, dtype=float)
-    norms = np.linalg.norm(matrix, axis=1, keepdims=True)
-    norms[norms == 0] = 1.0
-    normalized = matrix / norms
-    return normalized @ normalized.T
-
-
 def cosine_offdiag_stats(endmembers: np.ndarray) -> dict[str, float]:
-    cosine = cosine_matrix(endmembers)
-    mask = ~np.eye(cosine.shape[0], dtype=bool)
-    offdiag = cosine[mask]
-    return {
-        'mean_abs_offdiag': float(np.mean(np.abs(offdiag))),
-        'max_abs_offdiag': float(np.max(np.abs(offdiag))),
-        'min_offdiag': float(np.min(offdiag)),
-        'max_offdiag': float(np.max(offdiag)),
-    }
+    matrix = compute_correlation_matrix(endmembers, metric="cosine")
+    return summarize_correlation_matrix(matrix)
 
 
 def stats_table(rows: dict[str, dict[str, float]]) -> pd.DataFrame:
@@ -138,7 +124,7 @@ def run_diagnostics_notebook(config_path: Path, project_root: Path) -> None:
         normalization = run_cfg.normalized_normalization()
         transform_steps = run_cfg.normalized_transform_steps()
         transform_label = run_cfg.normalized_transform()
-        snr_db = run_cfg.resolved_snr_db()
+        snr_db = run_cfg.snr_db
         bands_key = _bands_key(run_cfg.serialized_bands_ranges())
 
         bands_label = ", ".join(
@@ -180,7 +166,7 @@ def run_diagnostics_notebook(config_path: Path, project_root: Path) -> None:
             y_title='Reflectance',
         ))
 
-        _, raw_endmembers_selected, _ = select_wavelength_ranges(
+        _, raw_endmembers_selected = select_wavelength_ranges(
             wavelengths=wavelength_axis_full,
             endmembers=endmembers_full,
             bands_ranges=bands_ranges,
@@ -188,7 +174,7 @@ def run_diagnostics_notebook(config_path: Path, project_root: Path) -> None:
         stats_payload = {'raw': cosine_offdiag_stats(raw_endmembers_selected)}
 
         normalized_endmembers_full, _ = apply_normalization(endmembers_full, endmembers_full, wavelength_axis_full, normalization)
-        _, normalized_endmembers_selected, _ = select_wavelength_ranges(
+        _, normalized_endmembers_selected = select_wavelength_ranges(
             wavelengths=wavelength_axis_full,
             endmembers=normalized_endmembers_full,
             bands_ranges=bands_ranges,

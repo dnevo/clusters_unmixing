@@ -12,9 +12,8 @@ def quadratic_normalize(endmembers: np.ndarray, wavelengths: np.ndarray) -> np.n
 
 
 def apply_normalization(endmembers: np.ndarray, pixels: np.ndarray, wavelengths: np.ndarray, normalization: str) -> tuple[np.ndarray, np.ndarray]:
-    mode = str(normalization).strip().lower()
-    if mode == 'without':
-        return np.asarray(endmembers, dtype=float), np.asarray(pixels, dtype=float)
-    if mode == 'with_quadratic':
+    if normalization == 'without':
+        return endmembers, pixels
+    if normalization == 'with_quadratic':
         return quadratic_normalize(endmembers=endmembers, wavelengths=wavelengths), quadratic_normalize(endmembers=pixels, wavelengths=wavelengths)
     raise ValueError(f'Unsupported normalization mode: {normalization}')
