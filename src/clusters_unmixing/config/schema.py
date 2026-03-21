@@ -38,14 +38,18 @@ class ModelSpecConfig(BaseModel):
     name: str
     params: dict[str, Any] = Field(default_factory=dict)
 
-    def normalized_name(self) -> str:
-            return self.name.strip().lower()
-
+    @model_validator(mode="before")
     @classmethod
-    def from_raw(cls, raw: Any) -> "ModelSpecConfig":
-        if isinstance(raw, str):
-            return cls(name=raw, params={})
-        return cls.model_validate(raw)
+    def _parse_str(cls, data: Any) -> Any:
+        if isinstance(data, str):
+            return {"name": data, "params": {}}
+        return data
+
+    def normalized_name(self) -> str:
+        name = self.name.strip().lower()
+        if not name:
+            raise ValueError("Model entry requires non-empty 'name'")
+        return name
 
 
 class BandRangeModel(BaseModel):
@@ -99,31 +103,30 @@ class ModelRunConfig(BaseModel):
     num_pixels: int
     snr_db: float
 
-    @classmethod
-    def from_dict(cls, raw: dict[str, Any]) -> "ModelRunConfig":
-        return cls.model_validate(raw)
-
     @field_validator("models")
     @classmethod
     def _validate_models(cls, value: list[str]) -> list[str]:
         if not value:
             raise ValueError("Model run 'models' must be non-empty")
-        normalized = []
-        for item in value:
-            if not isinstance(item, str) or not item.strip():
-                raise ValueError("Model run 'models' entries must be non-empty strings")
-            normalized.append(item)
+        normalized = [item.strip() for item in value if item.strip()]
+        if len(normalized) != len(value):
+            raise ValueError("Model run 'models' entries must be non-empty strings")
         return normalized
 
-
-    @field_validator("snr_db", mode="before")
+    @field_validator("num_pixels")
     @classmethod
-    def _validate_snr_db(cls, value: Any) -> Any:
-        if isinstance(value, str):
-            normalized = value.strip().lower()
-            if normalized in {"inf", "+inf", "infinity", "+infinity"}:
-                return float("inf")
+    def _validate_num_pixels(cls, value: int) -> int:
+        if value <= 0:
+            raise ValueError("Model run 'num_pixels' must be > 0")
         return value
+
+    @field_validator("normalization")
+    @classmethod
+    def _validate_normalization(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if normalized not in {"without", "with_quadratic"}:
+            raise ValueError("Model run 'normalization' must be one of: without, with_quadratic")
+        return normalized
 
     def normalized_models(self) -> list[str]:
         return [m.strip().lower() for m in self.models]
@@ -170,21 +173,8 @@ class ModelRunConfig(BaseModel):
                 labels.append(f"pca(n_components={int(params['n_components'])})")
         return "+".join(labels)
 
-    @field_validator("normalization")
-    @classmethod
-    def _validate_normalization(cls, value: str) -> str:
-        normalized = value.strip().lower()
-        if normalized not in {"without", "with_quadratic"}:
-            raise ValueError("Model run 'normalization' must be one of: without, with_quadratic")
-        return normalized
-
     def normalized_normalization(self) -> str:
         return self.normalization
-
-    def resolved_num_pixels(self) -> int:
-            if self.num_pixels <= 0:
-                raise ValueError("Model run 'num_pixels' must be > 0")
-            return self.num_pixels
 
     def projection_name(self) -> str:
         return _projection_name(self.normalized_bands_ranges(), self.normalized_transform(), self.normalized_normalization())
@@ -195,16 +185,6 @@ class ModelEvaluationConfig(BaseModel):
     output_subdir: str = "model_evaluation"
     models: list[ModelSpecConfig] = Field(default_factory=list)
     runs: list[ModelRunConfig] = Field(default_factory=list)
-
-    @classmethod
-    def from_dict(cls, raw: dict[str, Any]) -> "ModelEvaluationConfig":
-        models = [ModelSpecConfig.from_raw(item) for item in raw.get("models", [])]
-        runs = [ModelRunConfig.from_dict(item) for item in raw.get("runs", [])]
-        payload = dict(raw)
-        payload["models"] = models
-        payload["runs"] = runs
-        return cls.model_validate(payload)
-
 
 
 class ExperimentConfig(BaseModel):
@@ -220,7 +200,7 @@ class ExperimentConfig(BaseModel):
     def from_dict(cls, raw: dict[str, Any], config_dir: str | None = None) -> "ExperimentConfig":
         payload = dict(raw)
         payload["cluster_sets"] = [ClusterSetConfig.model_validate(item) for item in raw["cluster_sets"]]
-        payload["model_evaluation"] = ModelEvaluationConfig.from_dict(raw["model_evaluation"])
+        payload["model_evaluation"] = ModelEvaluationConfig.model_validate(raw["model_evaluation"])
         payload["config_dir"] = config_dir
         return cls.model_validate(payload)
 
@@ -235,4 +215,3 @@ class ExperimentConfig(BaseModel):
                 config_dir = candidate
                 break
         return cls.from_dict(raw, config_dir=str(config_dir))
-
