@@ -59,7 +59,7 @@ def _planned_model_runs(exp: ExperimentConfig) -> list[dict[str, Any]]:
             "transform_steps": item.normalized_transform_steps(),
             "projection": item.projection_name(),
             "models": [{"name": name, "params": dict(model_params[name])} for name in item.normalized_models()],
-            "num_pixels": item.resolved_num_pixels(),
+            "num_pixels": item.num_pixels,
             "snr_db": item.snr_db,
         })
     return runs

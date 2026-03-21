@@ -138,7 +138,7 @@ def run_diagnostics_notebook(config_path: Path, project_root: Path) -> None:
                     bands_label,
                     normalization,
                     transform_label,
-                    run_cfg.resolved_num_pixels(),
+                    run_cfg.num_pixels,
                     f'{snr_db:g} dB' if np.isfinite(snr_db) else 'inf',
                     ', '.join(run_cfg.normalized_models()),
                 ]

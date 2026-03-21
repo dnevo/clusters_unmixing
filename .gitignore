@@ -13,6 +13,7 @@ venv/
 
 # Packaging metadata
 *.egg-info/
+src/*.egg-info/
 build/
 dist/
 
