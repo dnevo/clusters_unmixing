@@ -1,24 +1,11 @@
 from __future__ import annotations
-
-import hashlib
-import json
 import yaml
-
 from pathlib import Path
 from typing import Any, Literal
-
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 BandRangeSpec = tuple[float, float, str]
 TransformStepSpec = tuple[str, dict[str, Any]]
-
-
-def _projection_name(bands_ranges: list[BandRangeSpec], transform: str, normalization: str) -> str:
-    transform_suffix = "raw" if transform == "raw" else hashlib.sha1(transform.encode("utf-8")).hexdigest()[:8]
-    normalization_suffix = "nq" if normalization == "with_quadratic" else "nw"
-    ranges_key = json.dumps(_serialize_bands_ranges_for_config(bands_ranges), separators=(",", ":"), ensure_ascii=False)
-    ranges_hash = hashlib.sha1(ranges_key.encode("utf-8")).hexdigest()[:8]
-    return f"br_{ranges_hash}_{transform_suffix}_{normalization_suffix}"
 
 
 def _serialize_bands_ranges_for_config(bands_ranges: list[BandRangeSpec]) -> list[Any]:
@@ -175,9 +162,6 @@ class ModelRunConfig(BaseModel):
 
     def normalized_normalization(self) -> str:
         return self.normalization
-
-    def projection_name(self) -> str:
-        return _projection_name(self.normalized_bands_ranges(), self.normalized_transform(), self.normalized_normalization())
 
 
 class ModelEvaluationConfig(BaseModel):

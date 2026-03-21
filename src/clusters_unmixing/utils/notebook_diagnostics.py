@@ -1,9 +1,7 @@
 ﻿from __future__ import annotations
 
-import json
 import sys
 from pathlib import Path
-from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -19,7 +17,7 @@ from clusters_unmixing.utils.diagnostics import (
     display_abundance_comparison_tables,
     plot_cluster_overview,
 )
-
+from clusters_unmixing.utils.run_helpers import resolve_cluster_path, bands_ranges_key
 
 def setup_notebook_imports(project_root: str | Path | None = None) -> Path:
     note_dir = Path.cwd()
@@ -32,16 +30,6 @@ def setup_notebook_imports(project_root: str | Path | None = None) -> Path:
     pd.set_option('display.max_columns', 200)
     pd.set_option('display.width', 180)
     return resolved_root
-
-
-def _bands_key(raw_bands_ranges: list[Any]) -> str:
-    return json.dumps(raw_bands_ranges, separators=(",", ":"), ensure_ascii=False)
-
-
-def _cluster_path_map(cfg: ExperimentConfig, project_root: str | Path | None = None) -> dict[str, Path]:
-    root = Path(project_root).resolve() if project_root is not None else None
-    config_dir = Path(cfg.config_dir or root or Path.cwd())
-    return {item.name: (config_dir / item.path).resolve() for item in cfg.cluster_sets}
 
 
 def cosine_offdiag_stats(endmembers: np.ndarray) -> dict[str, float]:
@@ -105,7 +93,10 @@ def plot_pixel_preview(
 def run_diagnostics_notebook(config_path: Path, project_root: Path) -> None:
     experiment_config = ExperimentConfig.from_file(config_path)
     result = run_correlation_experiments(experiment_config)
-    cluster_paths = _cluster_path_map(experiment_config, project_root=project_root)
+    cluster_paths = {
+        item.name: resolve_cluster_path(experiment_config, item.path)
+        for item in experiment_config.cluster_sets
+    }
 
     model_summary_path = Path(result['model_evaluation']['summary_path'])
     abundance_preview_path = Path(result['model_evaluation']['abundance_preview_path'])
@@ -125,7 +116,7 @@ def run_diagnostics_notebook(config_path: Path, project_root: Path) -> None:
         transform_steps = run_cfg.normalized_transform_steps()
         transform_label = run_cfg.normalized_transform()
         snr_db = run_cfg.snr_db
-        bands_key = _bands_key(run_cfg.serialized_bands_ranges())
+        bands_key = bands_ranges_key(run_cfg.normalized_bands_ranges())
 
         bands_label = ", ".join(
             f"{x_min:g}-{x_max:g} {reduce}"

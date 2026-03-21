@@ -16,23 +16,7 @@ from clusters_unmixing.metrics import compute_correlation_matrix, summarize_corr
 from clusters_unmixing.models.runner_registry import run_registered_model
 from clusters_unmixing.transforms.normalization import apply_normalization
 from clusters_unmixing.transforms.spectral_views import apply_transform, select_wavelength_ranges
-
-
-def _resolve_cluster_path(exp: ExperimentConfig, cluster_path: str) -> Path:
-    path = Path(cluster_path)
-    if path.is_absolute():
-        return path
-    candidates: list[Path] = []
-    if exp.config_dir:
-        config_dir = Path(exp.config_dir)
-        candidates.append(config_dir / path)
-        candidates.extend(parent / path for parent in config_dir.parents)
-    candidates.append(Path.cwd() / path)
-    for candidate in candidates:
-        if candidate.exists():
-            return candidate
-    return candidates[0] if candidates else path.resolve()
-
+from clusters_unmixing.utils.run_helpers import resolve_cluster_path, bands_ranges_key
 
 def _resolve_output_dir(exp: ExperimentConfig) -> Path:
     path = Path(exp.output_dir)
@@ -49,15 +33,14 @@ def _planned_model_runs(exp: ExperimentConfig) -> list[dict[str, Any]]:
     runs = []
     for item in model_eval.runs:
         bands_ranges = item.normalized_bands_ranges()
-        bands_ranges_key = json.dumps(item.serialized_bands_ranges(), separators=(",", ":"), ensure_ascii=False)
+        ranges_key = bands_ranges_key(bands_ranges)
         runs.append({
             "cluster_set": item.cluster_set,
             "bands_ranges": bands_ranges,
-            "bands_ranges_key": bands_ranges_key,
+            "bands_ranges_key": ranges_key,
             "normalization": item.normalized_normalization(),
             "transform": item.normalized_transform(),
             "transform_steps": item.normalized_transform_steps(),
-            "projection": item.projection_name(),
             "models": [{"name": name, "params": dict(model_params[name])} for name in item.normalized_models()],
             "num_pixels": item.num_pixels,
             "snr_db": item.snr_db,
@@ -139,7 +122,7 @@ def run_correlation_experiments(exp: ExperimentConfig) -> dict[str, Any]:
 
     for idx, run in enumerate(runs, start=1):
         cluster_cfg = next(item for item in exp.cluster_sets if item.name == run["cluster_set"])
-        cluster_path = _resolve_cluster_path(exp, cluster_cfg.path)
+        cluster_path = resolve_cluster_path(exp, cluster_cfg.path)
         wavelengths, raw_endmembers = load_wavelength_and_cluster_matrix(cluster_path)
 
         _set_global_seeds(0)
