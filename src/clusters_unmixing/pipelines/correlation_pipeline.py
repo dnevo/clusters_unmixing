@@ -38,7 +38,7 @@ def _planned_model_runs(exp: ExperimentConfig) -> list[dict[str, Any]]:
             "cluster_set": item.cluster_set,
             "bands_ranges": bands_ranges,
             "bands_ranges_key": ranges_key,
-            "normalization": item.normalized_normalization(),
+            "normalization": item.normalization,
             "transform": item.normalized_transform(),
             "transform_steps": item.normalized_transform_steps(),
             "models": [{"name": name, "params": dict(model_params[name])} for name in item.normalized_models()],

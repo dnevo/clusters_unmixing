@@ -1,4 +1,5 @@
 from __future__ import annotations
+import math
 import yaml
 from pathlib import Path
 from typing import Any, Literal
@@ -115,6 +116,19 @@ class ModelRunConfig(BaseModel):
             raise ValueError("Model run 'normalization' must be one of: without, with_quadratic")
         return normalized
 
+    @field_validator("snr_db")
+    @classmethod
+    def _validate_snr_db(cls, value: float) -> float:
+        if isinstance(value, bool):
+            raise ValueError("Model run 'snr_db' must be numeric, not bool")
+        if not isinstance(value, (int, float)):
+            raise ValueError("Model run 'snr_db' must be numeric")
+        if math.isnan(float(value)):
+            raise ValueError("Model run 'snr_db' cannot be NaN")
+        if float(value) < 0.0 and not math.isinf(float(value)):
+            raise ValueError("Model run 'snr_db' must be >= 0 or inf")
+        return float(value)
+
     def normalized_models(self) -> list[str]:
         return [m.strip().lower() for m in self.models]
 
@@ -159,9 +173,6 @@ class ModelRunConfig(BaseModel):
             elif name == "pca":
                 labels.append(f"pca(n_components={int(params['n_components'])})")
         return "+".join(labels)
-
-    def normalized_normalization(self) -> str:
-        return self.normalization
 
 
 class ModelEvaluationConfig(BaseModel):

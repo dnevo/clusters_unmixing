@@ -71,8 +71,8 @@ def plot_cluster_overview(
     - ranges in config with reduce="mean" -> dashed line + diamond marker at segment midpoint
     - wavelengths outside configured ranges -> dotted line
     """
-    wavelength_axis_arr = pd.Series(wavelength_axis, dtype=float).to_numpy()
-    endmembers_arr = pd.DataFrame(endmembers).to_numpy(dtype=float)
+    wavelength_axis_arr = np.asarray(wavelength_axis, dtype=float)
+    endmembers_arr = np.asarray(endmembers, dtype=float)
     if endmembers_arr.ndim != 2:
         raise ValueError("endmembers must be a 2D array of shape (clusters, bands)")
     if endmembers_arr.shape[1] != len(wavelength_axis_arr):
@@ -144,7 +144,7 @@ def plot_cluster_overview(
 
     fig.update_layout(
         title=title,
-        xaxis_title="Wavelength (um)",
+        xaxis_title="Wavelength (µm)",
         yaxis_title=y_title,
         height=480,
     )

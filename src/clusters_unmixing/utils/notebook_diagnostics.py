@@ -81,7 +81,7 @@ def plot_pixel_preview(
     fig.add_scatter(x=wavelength_axis_full, y=y_vpgdu, mode='lines', name='vpgdu')
     fig.update_layout(
         title=f'Reflectance by source | pixel_index={pixel_index}',
-        xaxis_title='Wavelength (Âµm)',
+        xaxis_title='Wavelength (µm)',
         yaxis_title='Value',
         template='plotly_white',
         width=950,
@@ -112,11 +112,11 @@ def run_diagnostics_notebook(config_path: Path, project_root: Path) -> None:
 
         cluster_set = run_cfg.cluster_set
         bands_ranges = run_cfg.normalized_bands_ranges()
-        normalization = run_cfg.normalized_normalization()
+        normalization = run_cfg.normalization
         transform_steps = run_cfg.normalized_transform_steps()
         transform_label = run_cfg.normalized_transform()
         snr_db = run_cfg.snr_db
-        bands_key = bands_ranges_key(run_cfg.normalized_bands_ranges())
+        bands_key = bands_ranges_key(bands_ranges)
 
         bands_label = ", ".join(
             f"{x_min:g}-{x_max:g} {reduce}"
@@ -202,8 +202,8 @@ def run_diagnostics_notebook(config_path: Path, project_root: Path) -> None:
             & (abundance_df['bands_ranges'] == bands_key)
             & (abundance_df['normalization'] == normalization)
             & (abundance_df['transform'] == transform_label)
+            & (abundance_df['snr_db'].astype(float) == float(snr_db))
         ].copy()
-        display(Markdown('### Abundance comparison by sampled pixel'))
         display_abundance_comparison_tables(abundance_rows, max_pixels=5)
 
         display(Markdown('### Synthetic pixel spectra preview'))
