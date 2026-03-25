@@ -19,5 +19,4 @@
 - `transforms/normalization.py`
 - `metrics.py`
 - `pipelines/correlation_pipeline.py`
-- `utils/diagnostics.py`
 - `utils/notebook_diagnostics.py`

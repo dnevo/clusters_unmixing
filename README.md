@@ -11,8 +11,7 @@ A lean spectral unmixing experiment framework centered on one configurable exper
 - `transforms/normalization.py`: normalization helpers
 - `metrics.py`: cosine and SAM correlation metrics
 - `pipelines/correlation_pipeline.py`: experiment runner
-- `utils/diagnostics.py`: plotting and table helpers
-- `utils/notebook_diagnostics.py`: notebook orchestration
+- `utils/notebook_diagnostics.py`: notebook diagnostics helpers, plotting, tables, and orchestration
 - `models/sunsal.py`, `models/vpgdu.py`: model implementations
 
 ## Entry points
