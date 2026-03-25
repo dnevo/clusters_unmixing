@@ -11,6 +11,7 @@
 ## Intentionally unchanged
 - `src/clusters_unmixing/models/sunsal.py`
 - `src/clusters_unmixing/models/vpgdu.py`
+- `src/clusters_unmixing/models/small_mlp.py`
 
 ## Core structure
 - `config/schema.py`

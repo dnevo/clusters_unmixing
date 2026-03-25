@@ -9,6 +9,23 @@ BandRangeSpec = tuple[float, float, str]
 TransformStepSpec = tuple[str, dict[str, Any]]
 
 
+ALLOWED_MODEL_NAMES = {"sunsal", "vpgdu", "small_mlp"}
+
+
+class SmallMLPParamsModel(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    hidden_dim_1: int = Field(64, ge=1)
+    hidden_dim_2: int = Field(32, ge=1)
+    epochs: int = Field(200, ge=1)
+    batch_size: int = Field(128, ge=1)
+    learning_rate: float = Field(1e-3, gt=0)
+    weight_decay: float = Field(1e-5, ge=0)
+    lambda_recon: float = Field(0.1, ge=0)
+    clip_grad_norm: float = Field(1.0, ge=0)
+    patience: int = Field(25, ge=1)
+    verbose: bool = False
+
+
 def _serialize_bands_ranges_for_config(bands_ranges: list[BandRangeSpec]) -> list[Any]:
     if all(reduce == "none" for _, _, reduce in bands_ranges):
         return [[x_min, x_max] for x_min, x_max, _ in bands_ranges]
@@ -32,6 +49,15 @@ class ModelSpecConfig(BaseModel):
         if isinstance(data, str):
             return {"name": data, "params": {}}
         return data
+
+    @model_validator(mode="after")
+    def _validate_params(self) -> "ModelSpecConfig":
+        name = self.normalized_name()
+        if name not in ALLOWED_MODEL_NAMES:
+            raise ValueError(f"Unsupported model '{self.name}'. Allowed models: {sorted(ALLOWED_MODEL_NAMES)}")
+        if name == "small_mlp":
+            self.params = SmallMLPParamsModel.model_validate(self.params).model_dump()
+        return self
 
     def normalized_name(self) -> str:
         name = self.name.strip().lower()
@@ -96,9 +122,12 @@ class ModelRunConfig(BaseModel):
     def _validate_models(cls, value: list[str]) -> list[str]:
         if not value:
             raise ValueError("Model run 'models' must be non-empty")
-        normalized = [item.strip() for item in value if item.strip()]
+        normalized = [item.strip().lower() for item in value if item.strip()]
         if len(normalized) != len(value):
             raise ValueError("Model run 'models' entries must be non-empty strings")
+        invalid = [name for name in normalized if name not in ALLOWED_MODEL_NAMES]
+        if invalid:
+            raise ValueError(f"Unsupported model names in run: {sorted(set(invalid))}")
         return normalized
 
     @field_validator("num_pixels")
@@ -107,6 +136,14 @@ class ModelRunConfig(BaseModel):
         if value <= 0:
             raise ValueError("Model run 'num_pixels' must be > 0")
         return value
+
+    @model_validator(mode="after")
+    def _validate_small_mlp_split_requirements(self) -> "ModelRunConfig":
+        if "small_mlp" in self.normalized_models() and self.num_pixels < 5:
+            raise ValueError(
+                "small_mlp requires num_pixels >= 5 so the 70%/20%/10% train/validation/test split is non-empty"
+            )
+        return self
 
     @field_validator("normalization")
     @classmethod

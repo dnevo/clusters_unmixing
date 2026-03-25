@@ -12,9 +12,9 @@ A lean spectral unmixing experiment framework centered on one configurable exper
 - `metrics.py`: cosine and SAM correlation metrics
 - `pipelines/correlation_pipeline.py`: experiment runner
 - `utils/notebook_diagnostics.py`: notebook diagnostics helpers, plotting, tables, and orchestration
-- `models/sunsal.py`, `models/vpgdu.py`: model implementations
+- `models/sunsal.py`, `models/vpgdu.py`, `models/small_mlp.py`: model implementations
 
 ## Entry points
 - `main.py`: run the configured experiment from the command line
-- `notebooks/00_cluster_diagnostics.ipynb`: inspect results interactively
+- `notebooks/00_cluster_diagnostics.ipynb`: inspect results interactively, including per-model abundance tables and pixel preview plots
 - `experiments/configs/correlation_options.yaml`: default experiment config

@@ -37,6 +37,19 @@ model_evaluation:
         t: 10
         verbose: false
 
+    - name: small_mlp
+      params:
+        hidden_dim_1: 64
+        hidden_dim_2: 32
+        epochs: 400
+        batch_size: 128
+        learning_rate: 0.001
+        weight_decay: 0.00001
+        lambda_recon: 0.1
+        clip_grad_norm: 1.0
+        patience: 20
+        verbose: true         # options: true | false
+
   runs:
 
     - cluster_set: 6clusters_thomas
@@ -58,9 +71,9 @@ model_evaluation:
           - name: pca
             params:
               n_components: 5
-      # without any transform:-
+      # without any transform:
       # transform:
-      #    steps: []
+      #   steps: []
       # first_derivative only:
       # transform:
       #   steps:
@@ -78,8 +91,8 @@ model_evaluation:
       #     - name: pca
       #       params:
       #         n_components: 5
-      num_pixels: 512 # number of synthetic pixels generated
 
+      num_pixels: 1024 # number of synthetic pixels generated
 
       # signal-to-noise ratio
       snr_db: 20.0 # number (e.g 30.0) or inf (for no noise)
@@ -87,4 +100,4 @@ model_evaluation:
       models:
         - sunsal
         - vpgdu
-
+        - small_mlp

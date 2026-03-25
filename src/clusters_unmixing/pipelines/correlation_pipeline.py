@@ -169,6 +169,7 @@ def run_correlation_experiments(exp: ExperimentConfig) -> dict[str, Any]:
                 model_name=model_spec['name'],
                 endmembers=endmembers_t,
                 pixels=projected_pixels_t,
+                true_abundances=torch.tensor(true_abundances, dtype=torch.float32, device=device),
                 params=model_spec['params'],
             )
             abundances = abundances_t.detach().cpu().numpy()

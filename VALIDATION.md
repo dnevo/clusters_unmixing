@@ -3,8 +3,8 @@
 ## Summary
 - Package metadata is present in `pyproject.toml`.
 - The command-line entrypoint in `main.py` now loads `experiments/configs/correlation_options.yaml`.
-- The notebook smoke script and notebook helpers are aligned with the current flattened module layout.
-- `src/clusters_unmixing/models/sunsal.py` and `src/clusters_unmixing/models/vpgdu.py` remain unchanged.
+- The notebook smoke script and notebook helpers are aligned with the current flattened module layout and render previews for all configured models present in the run outputs.
+- `src/clusters_unmixing/models/sunsal.py`, `src/clusters_unmixing/models/vpgdu.py`, and `src/clusters_unmixing/models/small_mlp.py` remain unchanged.
 
 ## Validation commands
 ```bash

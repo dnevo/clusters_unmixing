@@ -190,11 +190,12 @@ def plot_pixel_preview(
     abundance_rows: pd.DataFrame,
     snr_db: float,
 ) -> go.Figure:
-    row_sunsal = abundance_rows[(abundance_rows['pixel_index'] == pixel_index) & (abundance_rows['model'] == 'sunsal')].iloc[0]
-    row_vpgdu = abundance_rows[(abundance_rows['pixel_index'] == pixel_index) & (abundance_rows['model'] == 'vpgdu')].iloc[0]
-    a_true = abundance_vector(row_sunsal, 'true_a')
-    a_sunsal = abundance_vector(row_sunsal, 'est_a')
-    a_vpgdu = abundance_vector(row_vpgdu, 'est_a')
+    pixel_rows = abundance_rows[abundance_rows['pixel_index'] == pixel_index].sort_values('model').copy()
+    if pixel_rows.empty:
+        raise ValueError(f'No abundance rows found for pixel_index={pixel_index}')
+
+    reference_row = pixel_rows.iloc[0]
+    a_true = abundance_vector(reference_row, 'true_a')
     y_clean = np.asarray(a_true @ endmembers_full, dtype=float)
     if np.isinf(float(snr_db)):
         y_noisy = y_clean.copy()
@@ -204,13 +205,16 @@ def plot_pixel_preview(
         noise_std = signal_rms * float(10.0 ** (-float(snr_db) / 20.0))
         rng = np.random.default_rng(seed=int(pixel_index))
         y_noisy = y_clean + rng.normal(loc=0.0, scale=noise_std, size=y_clean.shape)
-    y_sunsal = np.asarray(a_sunsal @ endmembers_full, dtype=float)
-    y_vpgdu = np.asarray(a_vpgdu @ endmembers_full, dtype=float)
+
     fig = go.Figure()
     fig.add_scatter(x=wavelength_axis_full, y=y_clean, mode='lines', name='without_noise')
     fig.add_scatter(x=wavelength_axis_full, y=y_noisy, mode='lines', name='with_noise', line=dict(dash='dash'))
-    fig.add_scatter(x=wavelength_axis_full, y=y_sunsal, mode='lines', name='sunsal')
-    fig.add_scatter(x=wavelength_axis_full, y=y_vpgdu, mode='lines', name='vpgdu')
+    for _, row in pixel_rows.iterrows():
+        model_name = str(row['model'])
+        a_est = abundance_vector(row, 'est_a')
+        y_est = np.asarray(a_est @ endmembers_full, dtype=float)
+        fig.add_scatter(x=wavelength_axis_full, y=y_est, mode='lines', name=model_name)
+
     fig.update_layout(
         title=f'Reflectance by source | pixel_index={pixel_index}',
         xaxis_title='Wavelength (µm)',
