@@ -172,7 +172,7 @@ def run_correlation_experiments(exp: ExperimentConfig) -> dict[str, Any]:
                 params=model_spec['params'],
             )
             abundances = abundances_t.detach().cpu().numpy()
-            rmse = float(np.sqrt(np.mean((abundances - true_abundances) ** 2)))
+            rmse = float(np.sqrt(np.mean(np.square(abundances - true_abundances))))
             mae = float(np.mean(np.abs(abundances - true_abundances)))
             for metric_name, value in [('abundance_rmse', rmse), ('abundance_mae', mae)]:
                 model_rows.append({

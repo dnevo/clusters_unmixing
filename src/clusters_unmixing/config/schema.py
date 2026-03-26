@@ -226,10 +226,10 @@ class ExperimentConfig(BaseModel):
     cluster_sets: list[ClusterSetConfig]
     metrics: list[str] = Field(default_factory=lambda: ["cosine", "sam"])
     model_evaluation: ModelEvaluationConfig
-    config_dir: str | None = None
+    config_dir: str
 
     @classmethod
-    def from_dict(cls, raw: dict[str, Any], config_dir: str | None = None) -> "ExperimentConfig":
+    def from_dict(cls, raw: dict[str, Any], config_dir: str) -> "ExperimentConfig":
         payload = dict(raw)
         payload["cluster_sets"] = [ClusterSetConfig.model_validate(item) for item in raw["cluster_sets"]]
         payload["model_evaluation"] = ModelEvaluationConfig.model_validate(raw["model_evaluation"])

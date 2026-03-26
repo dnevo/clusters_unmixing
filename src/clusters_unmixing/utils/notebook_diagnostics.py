@@ -17,6 +17,8 @@ from clusters_unmixing.pipelines import run_correlation_experiments
 from clusters_unmixing.transforms import apply_normalization, apply_transform, select_wavelength_ranges
 from clusters_unmixing.utils.run_helpers import resolve_cluster_path, bands_ranges_key
 
+pd.set_option('display.max_columns', 200)
+pd.set_option('display.width', 180)
 
 def _resolve_abundance_columns(abundance_df: pd.DataFrame) -> tuple[list[str], list[str]]:
     true_cols = [c for c in abundance_df.columns if c.startswith('true_a')]
@@ -151,18 +153,6 @@ def plot_cluster_overview(
     )
     return fig
 
-def setup_notebook_imports(project_root: str | Path | None = None) -> Path:
-    note_dir = Path.cwd()
-    resolved_root = Path(project_root).resolve() if project_root is not None else (
-        note_dir.parent if note_dir.name == 'notebooks' else note_dir
-    ).resolve()
-    src_dir = resolved_root / 'src'
-    if str(src_dir) not in sys.path:
-        sys.path.insert(0, str(src_dir))
-    pd.set_option('display.max_columns', 200)
-    pd.set_option('display.width', 180)
-    return resolved_root
-
 
 def cosine_offdiag_stats(endmembers: np.ndarray) -> dict[str, float]:
     matrix = compute_correlation_matrix(endmembers, metric="cosine")
@@ -226,7 +216,8 @@ def plot_pixel_preview(
     return fig
 
 
-def run_diagnostics_notebook(config_path: Path, project_root: Path) -> None:
+def run_diagnostics_notebook(project_root: Path) -> None:
+    config_path =  project_root / 'experiments' / 'configs' / 'correlation_options.yaml'
     experiment_config = ExperimentConfig.from_file(config_path)
     result = run_correlation_experiments(experiment_config)
     cluster_paths = {
