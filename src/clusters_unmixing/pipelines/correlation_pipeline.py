@@ -18,14 +18,6 @@ from clusters_unmixing.transforms.normalization import apply_normalization
 from clusters_unmixing.transforms.spectral_views import apply_transform, select_wavelength_ranges
 from clusters_unmixing.utils.run_helpers import resolve_cluster_path, bands_ranges_key
 
-def _resolve_output_dir(exp: ExperimentConfig) -> Path:
-    path = Path(exp.output_dir)
-    if path.is_absolute():
-        return path
-    if exp.config_dir:
-        return Path(exp.config_dir) / path
-    return Path.cwd() / path
-
 
 def _planned_model_runs(exp: ExperimentConfig) -> list[dict[str, Any]]:
     model_eval = exp.model_evaluation
@@ -100,7 +92,14 @@ def _make_synthetic_pixels(endmembers: np.ndarray, num_pixels: int, snr_db: floa
 
 
 def run_correlation_experiments(exp: ExperimentConfig) -> dict[str, Any]:
-    output_dir = _resolve_output_dir(exp) / exp.run_name
+    output_root = Path(exp.output_dir)
+    if not output_root.is_absolute():
+        if exp.config_dir:
+            output_root = Path(exp.config_dir) / output_root
+        else:
+            output_root = Path.cwd() / output_root
+
+    output_dir = output_root / exp.run_name
     output_dir.mkdir(parents=True, exist_ok=True)
     runs = _planned_model_runs(exp)
 
