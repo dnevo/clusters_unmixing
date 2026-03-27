@@ -1,4 +1,5 @@
 from __future__ import annotations
+import json
 import math
 import yaml
 from pathlib import Path
@@ -30,6 +31,10 @@ def _serialize_bands_ranges_for_config(bands_ranges: list[BandRangeSpec]) -> lis
     if all(reduce == "none" for _, _, reduce in bands_ranges):
         return [[x_min, x_max] for x_min, x_max, _ in bands_ranges]
     return [{"range_µm": [x_min, x_max], "reduce": reduce} for x_min, x_max, reduce in bands_ranges]
+
+def serialize_bands_ranges_key(bands_ranges: list[BandRangeSpec]) -> str:
+    payload = _serialize_bands_ranges_for_config(bands_ranges)
+    return json.dumps(payload, separators=(",", ":"), ensure_ascii=False)
 
 
 class ClusterSetConfig(BaseModel):
@@ -219,29 +224,31 @@ class ModelEvaluationConfig(BaseModel):
 
 
 class ExperimentConfig(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
     experiment_name: str = "correlation_experiment"
     cluster_sets: list[ClusterSetConfig]
     metrics: list[str] = Field(default_factory=lambda: ["cosine", "sam"])
     model_evaluation: ModelEvaluationConfig
-    config_dir: str
+    project_root: Path
 
     @classmethod
-    def from_dict(cls, raw: dict[str, Any], config_dir: str) -> "ExperimentConfig":
+    def from_dict(cls, raw: dict[str, Any], project_root: Path) -> "ExperimentConfig":
         payload = dict(raw)
         payload["cluster_sets"] = [ClusterSetConfig.model_validate(item) for item in raw["cluster_sets"]]
         payload["model_evaluation"] = ModelEvaluationConfig.model_validate(raw["model_evaluation"])
-        payload["config_dir"] = config_dir
+        payload["project_root"] = Path(project_root).resolve()
         return cls.model_validate(payload)
 
+    def resolve_path(self, value: str) -> Path:
+        return self.project_root / value
+
+    @property
+    def experiment_output_dir(self) -> Path:
+        return self.project_root / "experiments" / "outputs" / self.experiment_name
+
     @classmethod
-    def from_file(cls, config_path: Path) -> "ExperimentConfig":
-        config_path = Path(config_path)
+    def from_config_file(cls, project_root: Path) -> "ExperimentConfig":
+        config_path = project_root / "experiments" / "configs" / "configuration.yaml"
         text = config_path.read_text(encoding="utf-8")
         raw = yaml.safe_load(text)
-        config_dir = config_path.parent.resolve()
-        for candidate in [config_dir, *config_dir.parents]:
-            if (candidate / "pyproject.toml").exists() or (candidate / ".git").exists():
-                config_dir = candidate
-                break
-        return cls.from_dict(raw, config_dir=str(config_dir))
+        return cls.from_dict(raw, project_root=project_root)

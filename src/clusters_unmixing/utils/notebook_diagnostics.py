@@ -1,6 +1,5 @@
 ﻿from __future__ import annotations
 
-import sys
 from pathlib import Path
 from typing import Any
 
@@ -10,13 +9,11 @@ import plotly.graph_objects as go
 from IPython.display import Markdown, display
 
 from clusters_unmixing.config import ExperimentConfig
-from clusters_unmixing.config.schema import BandRangeSpec
+from clusters_unmixing.config.schema import BandRangeSpec, serialize_bands_ranges_key
 from clusters_unmixing.metrics import compute_correlation_matrix, summarize_correlation_matrix
 from clusters_unmixing.dataio import load_wavelength_and_cluster_matrix
 from clusters_unmixing.pipelines import run_correlation_experiments
 from clusters_unmixing.transforms import apply_normalization, apply_transform, select_wavelength_ranges
-from clusters_unmixing.utils.run_helpers import resolve_cluster_path, bands_ranges_key
-
 pd.set_option('display.max_columns', 200)
 pd.set_option('display.width', 180)
 
@@ -217,11 +214,10 @@ def plot_pixel_preview(
 
 
 def run_diagnostics_notebook(project_root: Path) -> None:
-    config_path =  project_root / 'experiments' / 'configs' / 'correlation_options.yaml'
-    experiment_config = ExperimentConfig.from_file(config_path)
+    experiment_config = ExperimentConfig.from_config_file(project_root)
     result = run_correlation_experiments(experiment_config)
     cluster_paths = {
-        item.name: resolve_cluster_path(experiment_config, item.path)
+        item.name: experiment_config.resolve_path(item.path)
         for item in experiment_config.cluster_sets
     }
 
@@ -243,7 +239,7 @@ def run_diagnostics_notebook(project_root: Path) -> None:
         transform_steps = run_cfg.normalized_transform_steps()
         transform_label = run_cfg.normalized_transform()
         snr_db = run_cfg.snr_db
-        bands_key = bands_ranges_key(bands_ranges)
+        bands_key = serialize_bands_ranges_key(bands_ranges)
 
         bands_label = ", ".join(
             f"{x_min:g}-{x_max:g} {reduce}"

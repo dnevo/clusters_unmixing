@@ -17,4 +17,22 @@ A lean spectral unmixing experiment framework centered on one configurable exper
 ## Entry points
 - `main.py`: run the configured experiment from the command line
 - `notebooks/00_cluster_diagnostics.ipynb`: inspect results interactively, including per-model abundance tables and pixel preview plots
-- `experiments/configs/correlation_options.yaml`: default experiment config
+- `experiments/configs/configuration.yaml`: default experiment config
+
+## Experiment config
+- `experiment_name` controls the experiment output folder name under `experiments/outputs/`
+- `cluster_sets` defines the available input cluster CSV files
+- `metrics` selects which correlation metrics to compute
+- `model_evaluation.models` configures model hyperparameters
+- `model_evaluation.runs` defines the evaluation runs to execute
+
+Relative paths in the config are resolved from the project root supplied by the caller when loading the config.
+
+## Output layout
+Results are written to:
+
+- `experiments/outputs/{experiment_name}/correlation_summary.csv`
+- `experiments/outputs/{experiment_name}/model_summary.csv`
+- `experiments/outputs/{experiment_name}/abundance_preview.csv`
+
+The output root is fixed in code to `experiments/outputs`; it is no longer configured in YAML.

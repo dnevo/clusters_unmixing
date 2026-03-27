@@ -1,23 +1,19 @@
 from __future__ import annotations
 
-import json
 import random
-from pathlib import Path
 from typing import Any
 
 import numpy as np
 import pandas as pd
 import torch
 
-from clusters_unmixing.config.schema import ExperimentConfig
+from clusters_unmixing.config.schema import ExperimentConfig, serialize_bands_ranges_key
 from clusters_unmixing.data import generate_samples
 from clusters_unmixing.dataio import load_wavelength_and_cluster_matrix
 from clusters_unmixing.metrics import compute_correlation_matrix, summarize_correlation_matrix
 from clusters_unmixing.models.runner_registry import run_registered_model
 from clusters_unmixing.transforms.normalization import apply_normalization
 from clusters_unmixing.transforms.spectral_views import apply_transform, select_wavelength_ranges
-from clusters_unmixing.utils.run_helpers import resolve_cluster_path, bands_ranges_key
-
 
 def _planned_model_runs(exp: ExperimentConfig) -> list[dict[str, Any]]:
     model_eval = exp.model_evaluation
@@ -25,7 +21,7 @@ def _planned_model_runs(exp: ExperimentConfig) -> list[dict[str, Any]]:
     runs = []
     for item in model_eval.runs:
         bands_ranges = item.normalized_bands_ranges()
-        ranges_key = bands_ranges_key(bands_ranges)
+        ranges_key = serialize_bands_ranges_key(bands_ranges)
         runs.append({
             "cluster_set": item.cluster_set,
             "bands_ranges": bands_ranges,
@@ -92,14 +88,7 @@ def _make_synthetic_pixels(endmembers: np.ndarray, num_pixels: int, snr_db: floa
 
 
 def run_correlation_experiments(exp: ExperimentConfig) -> dict[str, Any]:
-    output_root = Path("experiments/outputs")
-    if not output_root.is_absolute():
-        if exp.config_dir:
-            output_root = Path(exp.config_dir) / output_root
-        else:
-            output_root = Path.cwd() / output_root
-
-    output_dir = output_root / exp.experiment_name
+    output_dir = exp.experiment_output_dir
     output_dir.mkdir(parents=True, exist_ok=True)
     runs = _planned_model_runs(exp)
 
@@ -122,7 +111,7 @@ def run_correlation_experiments(exp: ExperimentConfig) -> dict[str, Any]:
 
     for idx, run in enumerate(runs, start=1):
         cluster_cfg = next(item for item in exp.cluster_sets if item.name == run["cluster_set"])
-        cluster_path = resolve_cluster_path(exp, cluster_cfg.path)
+        cluster_path = exp.resolve_path(cluster_cfg.path)
         wavelengths, raw_endmembers = load_wavelength_and_cluster_matrix(cluster_path)
 
         _set_global_seeds(0)

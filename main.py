@@ -10,7 +10,6 @@ from clusters_unmixing.config import ExperimentConfig
 from clusters_unmixing.pipelines import run_correlation_experiments
 
 if __name__ == "__main__":
-    config_path = PROJECT_ROOT / "experiments" / "configs" / "correlation_options.yaml"
-    experiment_config = ExperimentConfig.from_file(config_path)
+    experiment_config = ExperimentConfig.from_config_file(PROJECT_ROOT)
     result = run_correlation_experiments(experiment_config)
     print(result)
