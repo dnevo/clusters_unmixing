@@ -231,7 +231,7 @@ def run_diagnostics_notebook(project_root: Path) -> None:
     model_df = pd.read_csv(model_summary_path)
     abundance_df = pd.read_csv(abundance_preview_path)
 
-    display(Markdown(f"**Run name:** `{result['run_name']}`\n\n**Output dir:** `{result['output_dir']}`"))
+    display(Markdown(f"**Experiment name:** `{result['experiment_name']}`\n\n**Output dir:** `{result['output_dir']}`"))
 
     model_eval = experiment_config.model_evaluation
     for run_index, run_cfg in enumerate(model_eval.runs, start=1):

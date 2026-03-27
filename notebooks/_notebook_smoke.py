@@ -11,5 +11,4 @@ if str(SRC_DIR) not in sys.path:
 
 from clusters_unmixing.utils import run_diagnostics_notebook
 
-CONFIG_PATH = project_root / "experiments" / "configs" / "correlation_options.yaml"
 run_diagnostics_notebook(project_root=project_root)

@@ -1,5 +1,4 @@
-run_name: cluster_corr_options
-output_dir: experiments/outputs
+experiment_name: cluster_corr_options
 
 cluster_sets:
 
@@ -15,8 +14,6 @@ metrics:
   - sam
 
 model_evaluation:
-  output_subdir: model_evaluation
-
   # models registered in models/runner_registry.py
   models:
 
@@ -51,7 +48,7 @@ model_evaluation:
         verbose: true         # options: true | false
 
   runs:
-
+    # run 1/2
     - cluster_set: 6clusters_thomas
 
       bands_ranges:
@@ -101,3 +98,23 @@ model_evaluation:
         - sunsal
         - vpgdu
         - small_mlp
+
+    # run 2/2
+    - cluster_set: 6clusters_thomas
+
+      bands_ranges:
+
+        - range_µm: [0.5, 2.5]
+          reduce: none          # options: none | mean
+
+      normalization: with_quadratic   # options: without | with_quadratic
+      transform:
+        steps: []   # no transform
+
+      num_pixels: 256 # number of synthetic pixels generated
+
+      # signal-to-noise ratio
+      snr_db: 30.0 # number (e.g 30.0) or inf (for no noise)
+
+      models:
+        - sunsal

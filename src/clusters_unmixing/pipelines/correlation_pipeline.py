@@ -92,14 +92,14 @@ def _make_synthetic_pixels(endmembers: np.ndarray, num_pixels: int, snr_db: floa
 
 
 def run_correlation_experiments(exp: ExperimentConfig) -> dict[str, Any]:
-    output_root = Path(exp.output_dir)
+    output_root = Path("experiments/outputs")
     if not output_root.is_absolute():
         if exp.config_dir:
             output_root = Path(exp.config_dir) / output_root
         else:
             output_root = Path.cwd() / output_root
 
-    output_dir = output_root / exp.run_name
+    output_dir = output_root / exp.experiment_name
     output_dir.mkdir(parents=True, exist_ok=True)
     runs = _planned_model_runs(exp)
 
@@ -111,7 +111,7 @@ def run_correlation_experiments(exp: ExperimentConfig) -> dict[str, Any]:
         summary_path = output_dir / 'correlation_summary.csv'
         pd.DataFrame(summary_rows).to_csv(summary_path, index=False)
         return {
-            'run_name': exp.run_name,
+            'experiment_name': exp.experiment_name,
             'output_dir': str(output_dir),
             'summary_path': str(summary_path),
             'n_runs': 0,
@@ -206,16 +206,13 @@ def run_correlation_experiments(exp: ExperimentConfig) -> dict[str, Any]:
                 abundance_preview_rows.append(row)
 
     summary_path = output_dir / 'correlation_summary.csv'
-    model_dir = output_dir / exp.model_evaluation.output_subdir
-
-    model_dir.mkdir(parents=True, exist_ok=True)
-    model_summary_path = model_dir / 'model_summary.csv'
-    abundance_preview_path = model_dir / 'abundance_preview.csv'
+    model_summary_path = output_dir / 'model_summary.csv'
+    abundance_preview_path = output_dir / 'abundance_preview.csv'
     pd.DataFrame(summary_rows).to_csv(summary_path, index=False)
     pd.DataFrame(model_rows).to_csv(model_summary_path, index=False)
     pd.DataFrame(abundance_preview_rows).to_csv(abundance_preview_path, index=False)
     return {
-        'run_name': exp.run_name,
+        'experiment_name': exp.experiment_name,
         'output_dir': str(output_dir),
         'summary_path': str(summary_path),
         'n_runs': len(runs),

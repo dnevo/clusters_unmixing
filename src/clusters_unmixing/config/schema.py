@@ -214,15 +214,13 @@ class ModelRunConfig(BaseModel):
 
 class ModelEvaluationConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    output_subdir: str = "model_evaluation"
     models: list[ModelSpecConfig] = Field(default_factory=list)
     runs: list[ModelRunConfig] = Field(default_factory=list)
 
 
 class ExperimentConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    run_name: str = "correlation_experiment"
-    output_dir: str = "experiments/outputs"
+    experiment_name: str = "correlation_experiment"
     cluster_sets: list[ClusterSetConfig]
     metrics: list[str] = Field(default_factory=lambda: ["cosine", "sam"])
     model_evaluation: ModelEvaluationConfig
@@ -237,11 +235,11 @@ class ExperimentConfig(BaseModel):
         return cls.model_validate(payload)
 
     @classmethod
-    def from_file(cls, config_path: str | Path) -> "ExperimentConfig":
-        path = Path(config_path)
-        text = path.read_text(encoding="utf-8")
+    def from_file(cls, config_path: Path) -> "ExperimentConfig":
+        config_path = Path(config_path)
+        text = config_path.read_text(encoding="utf-8")
         raw = yaml.safe_load(text)
-        config_dir = path.parent.resolve()
+        config_dir = config_path.parent.resolve()
         for candidate in [config_dir, *config_dir.parents]:
             if (candidate / "pyproject.toml").exists() or (candidate / ".git").exists():
                 config_dir = candidate
