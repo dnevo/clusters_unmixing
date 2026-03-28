@@ -197,7 +197,7 @@ class VPGDU:
         return abundance_init
 
     def _solve_core(self, endmembers: torch.Tensor, pixels: torch.Tensor) -> torch.Tensor:
-        """Solve the constrained unmixing problem.
+        """Solve the constrained unmixing problem. (Algorithm 2 from paper)
 
         Parameters
         ----------
@@ -240,6 +240,7 @@ class VPGDU:
                     print(f"All pixels converged at iteration {iteration}")
                 break
 
+            # Gradient (Eq. 33-40
             grad_1 = self.endmembers @ measurements_active.T
             endmembers_times_abundance = abundance_active.T @ self.endmembers
             sum_sq = torch.sum(endmembers_times_abundance * endmembers_times_abundance, dim=1, keepdim=True).T
@@ -253,6 +254,7 @@ class VPGDU:
             grad_d = grad_5 * (grad_2.pow(1.5))
             grad_phi = grad_n / (grad_d + 1e-9)
 
+            # Step size (Eq. 41-48)
             delta_1 = dot_m_ef
             delta_2 = torch.sum(grad_phi * grad_3, dim=0, keepdim=True)
             delta_3 = torch.sum(abundance_active * grad_3, dim=0, keepdim=True)
@@ -264,12 +266,14 @@ class VPGDU:
             step_size = delta_n / (delta_d + 1e-9)
             delta_k = step_size.expand(n_endmembers, -1)
 
+            # Update with projection (Eq. 49)
             unprojected = abundance_active + delta_k * grad_phi
             abundance_next_active = self.simplex_projection(unprojected)
 
             current_indices = pixel_indices[active_mask]
             abundance_hat[:, current_indices] = abundance_next_active
 
+            # Convergence check
             if (iteration + 1) % self.cfg.t == 0:
                 abundance_curr_active = abundance_hat[:, current_indices]
                 abundance_prev_active = abundance_prev[:, current_indices]

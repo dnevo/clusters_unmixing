@@ -19,8 +19,8 @@ model_evaluation:
 
     - name: sunsal
       params:
-        mu: 0.001
-        lambda_reg: 0.0
+        μ: 0.001
+        λ_reg: 0.0
         max_iters: 300
         tol: 1.0e-6
         check_every: 10

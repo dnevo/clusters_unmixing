@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
 
 import torch
 import torch.nn as nn
@@ -48,9 +47,14 @@ class SmallMLPUnmixing:
     true_abundances : (N, K)
     """
 
-    def __init__(self, config: SmallMLPConfig):
+    def __init__(self, config: SmallMLPConfig, in_dim: int, out_dim: int):
         self.cfg = config
-        self.model: Optional[_AbundanceMLP] = None
+        self.model = _AbundanceMLP(
+            in_dim=in_dim,
+            out_dim=out_dim,
+            hidden_dim_1=config.hidden_dim_1,
+            hidden_dim_2=config.hidden_dim_2,
+        )
         self.history: dict[str, list[float | int]] = {
             "epoch": [],
             "train_loss": [],
@@ -60,10 +64,10 @@ class SmallMLPUnmixing:
             "val_abund_loss": [],
             "val_recon_loss": [],
         }
-        self.best_val_loss: Optional[float] = None
-        self.test_loss: Optional[float] = None
-        self.test_abund_loss: Optional[float] = None
-        self.test_recon_loss: Optional[float] = None
+        self.best_val_loss: float = float("inf")
+        self.test_loss: float = float("nan")
+        self.test_abund_loss: float = float("nan")
+        self.test_recon_loss: float = float("nan")
 
     def _split_counts(self, n_samples: int) -> tuple[int, int, int]:
         train_count = int(n_samples * 0.70)
@@ -127,16 +131,17 @@ class SmallMLPUnmixing:
 
         x_test = pixels_n_bands[train_count + val_count :]
         y_test = true_abundances_n_k[train_count + val_count :]
+        if int(self.model.fc1.in_features) != bands or int(self.model.fc3.out_features) != n_endmembers:
+            raise ValueError(
+                f"SmallMLPUnmixing was initialized for in_dim={self.model.fc1.in_features}, "
+                f"out_dim={self.model.fc3.out_features}, but solve received bands={bands}, "
+                f"n_endmembers={n_endmembers}"
+            )
 
-        self.model = _AbundanceMLP(
-            in_dim=bands,
-            out_dim=n_endmembers,
-            hidden_dim_1=cfg.hidden_dim_1,
-            hidden_dim_2=cfg.hidden_dim_2,
-        ).to(device=device, dtype=dtype)
+        model = self.model.to(device=device, dtype=dtype)
 
         optimizer = torch.optim.Adam(
-            self.model.parameters(),
+            model.parameters(),
             lr=cfg.learning_rate,
             weight_decay=cfg.weight_decay,
         )
@@ -147,7 +152,7 @@ class SmallMLPUnmixing:
         epochs_without_improvement = 0
 
         for epoch in range(1, int(cfg.epochs) + 1):
-            self.model.train()
+            model.train()
             permutation = torch.randperm(train_count, device=device)
 
             train_loss_sum = 0.0
@@ -168,7 +173,7 @@ class SmallMLPUnmixing:
                 )
                 total_loss.backward()
                 if cfg.clip_grad_norm > 0:
-                    torch.nn.utils.clip_grad_norm_(self.model.parameters(), cfg.clip_grad_norm)
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), cfg.clip_grad_norm)
                 optimizer.step()
 
                 train_loss_sum += float(total_loss.item())
@@ -180,7 +185,7 @@ class SmallMLPUnmixing:
             mean_train_abund = train_abund_sum / max(1, num_batches)
             mean_train_recon = train_recon_sum / max(1, num_batches)
 
-            self.model.eval()
+            model.eval()
             val_loss, val_abund_loss, val_recon_loss = self._evaluate_split(
                 pixels=x_val,
                 true_abundances=y_val,
@@ -204,7 +209,7 @@ class SmallMLPUnmixing:
 
             if val_loss < best_val_loss:
                 best_val_loss = val_loss
-                best_state = {k: v.detach().clone() for k, v in self.model.state_dict().items()}
+                best_state = {k: v.detach().clone() for k, v in model.state_dict().items()}
                 epochs_without_improvement = 0
             else:
                 epochs_without_improvement += 1
@@ -212,11 +217,11 @@ class SmallMLPUnmixing:
                     break
 
         if best_state is not None:
-            self.model.load_state_dict(best_state)
+            model.load_state_dict(best_state)
 
         self.best_val_loss = best_val_loss
 
-        self.model.eval()
+        model.eval()
         self.test_loss, self.test_abund_loss, self.test_recon_loss = self._evaluate_split(
             pixels=x_test,
             true_abundances=y_test,
@@ -224,6 +229,6 @@ class SmallMLPUnmixing:
         )
 
         with torch.no_grad():
-            abundances_all = self.model(pixels_n_bands)
+            abundances_all = model(pixels_n_bands)
 
         return abundances_all

@@ -59,8 +59,8 @@ def ensure_2d(x: torch.Tensor) -> torch.Tensor:
 class SunSALConfig:
     """Configuration for the SUnSAL ADMM solver."""
 
-    mu: float = 0.05
-    lambda_reg: float = 0.0
+    μ: float = 0.05
+    λ_reg: float = 0.0
     max_iters: int = 500
     tol: float = 1e-6
     check_every: int = 10
@@ -152,14 +152,14 @@ class SunSAL:
         u = x.clone()
         d = torch.zeros_like(x)
 
+        # Precompute B factorization and C vector, as defined in Fig. 2 of the paper
         at = endmembers
-        b = at @ endmembers.T + cfg.mu * torch.eye(n_endmembers, device=device, dtype=dtype)
+        b = at @ endmembers.T + cfg.μ * torch.eye(n_endmembers, device=device, dtype=dtype)
 
-        chol_ok = True
+        chol: torch.Tensor | None
         try:
             chol = torch.linalg.cholesky(b)
         except Exception:
-            chol_ok = False
             chol = None
 
         def solve_b(rhs: torch.Tensor) -> torch.Tensor:
@@ -176,7 +176,7 @@ class SunSAL:
                 Linear solve result with the same leading dimensions as ``rhs``.
             """
 
-            if chol_ok:
+            if chol is not None:
                 return torch.cholesky_solve(rhs, chol)
             return torch.linalg.solve(b, rhs)
 
@@ -185,20 +185,27 @@ class SunSAL:
         denom = (ones.T @ b_inv_ones).squeeze().clamp_min(cfg.eps)
         c = b_inv_ones / denom
 
+        # Convergence bookkeeping
         x_prev = x.clone()
         check_every = max(1, int(cfg.check_every))
 
         for iteration in range(int(cfg.max_iters)):
-            w = at @ y + cfg.mu * (u + d)
+            # ADMM update step for 'w' (Fig. 2, line 3)
+            w = at @ y + cfg.μ * (u + d)
             b_inv_w = solve_b(w)
 
+            # ADMM update step for 'x' (Fig. 2, line 4)
             s = ones.T @ b_inv_w
             x = b_inv_w - c @ (s - 1.0)
 
+            # ADMM update step for 'v' (Fig. 2, line 5)
             v = x - d
-            tau = cfg.lambda_reg / max(cfg.mu, cfg.eps)
+
+             # ADMM update step for 'u' (Fig. 2, line 6)
+            tau = cfg.λ_reg / max(cfg.μ, cfg.eps)
             u = torch.clamp(soft_threshold(v, tau), min=0.0)
 
+             # ADMM update step for 'd' (Fig. 2, line 7)
             residual = x - u
             d = d - residual
 
