@@ -70,24 +70,23 @@ def _set_global_seeds(seed: int) -> None:
 
 
 def _make_synthetic_pixels(endmembers: np.ndarray, num_pixels: int, snr_db: float) -> tuple[np.ndarray, np.ndarray]:
-    n_endmembers = int(endmembers.shape[0])
-    raw_endmembers = torch.as_tensor(endmembers, dtype=torch.float32)
+    n_endmembers = endmembers.shape[0]
     abundances = generate_samples(
         num_samples=num_pixels,
         max_non_zero_endmembers=n_endmembers,
         num_endmembers=n_endmembers,
     )
-    clean_pixels = abundances @ raw_endmembers
+    clean_pixels = abundances @ endmembers
     if np.isinf(snr_db):
-        return clean_pixels.detach().cpu().numpy(), abundances.detach().cpu().numpy()
-    signal_power = float(clean_pixels.pow(2).mean().item())
+        return clean_pixels, abundances
+    signal_power = float((clean_pixels ** 2).mean())
     signal_rms = float(np.sqrt(max(signal_power, 0.0)))
     noise_std = signal_rms * float(10.0 ** (-snr_db / 20.0))
-    noisy_pixels = clean_pixels + (noise_std * torch.randn_like(clean_pixels))
-    return noisy_pixels.detach().cpu().numpy(), abundances.detach().cpu().numpy()
+    noise = np.random.normal(loc=0.0, scale=1.0, size=clean_pixels.shape).astype(clean_pixels.dtype)
+    noisy_pixels = clean_pixels + (noise_std * noise)
+    return noisy_pixels, abundances
 
-
-def run_correlation_experiments(exp: ExperimentConfig) -> dict[str, Any]:
+def run_experiments(exp: ExperimentConfig) -> dict[str, Any]:
     output_dir = exp.experiment_output_dir
     output_dir.mkdir(parents=True, exist_ok=True)
     runs = _planned_model_runs(exp)

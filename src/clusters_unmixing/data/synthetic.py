@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import random
 
-import torch
+import numpy as np
 
 
-def generate_samples(num_samples: int, max_non_zero_endmembers: int, num_endmembers: int = 6) -> torch.Tensor:
+def generate_samples(num_samples: int, max_non_zero_endmembers: int, num_endmembers: int = 6) -> np.ndarray:
     """Generate legacy-compatible synthetic abundance vectors.
 
     Behavior matches the legacy project:
@@ -17,10 +17,10 @@ def generate_samples(num_samples: int, max_non_zero_endmembers: int, num_endmemb
     Randomness is intentionally driven by Python's ``random`` module so callers can
     reproduce the legacy results by resetting ``random.seed(...)`` before calling.
     """
-    generated_samples: list[torch.Tensor] = []
+    generated_samples: list[np.ndarray] = []
 
     for i in range(num_endmembers):
-        pure_endmember = torch.zeros(num_endmembers, dtype=torch.float32)
+        pure_endmember = np.zeros(num_endmembers, dtype=np.float32)
         pure_endmember[i] = 1.0
         generated_samples.append(pure_endmember)
 
@@ -40,9 +40,9 @@ def generate_samples(num_samples: int, max_non_zero_endmembers: int, num_endmemb
             parts.append(10 - prev_point)
             fractions = [p / 10.0 for p in parts]
 
-        sample = torch.zeros(num_endmembers, dtype=torch.float32)
+        sample = np.zeros(num_endmembers, dtype=np.float32)
         for idx, val in zip(non_zero_indices, fractions):
             sample[idx] = float(val)
         generated_samples.append(sample)
 
-    return torch.stack(generated_samples[:num_samples])
+    return np.stack(generated_samples[:num_samples], axis=0)

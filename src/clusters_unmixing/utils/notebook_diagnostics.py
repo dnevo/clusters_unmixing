@@ -12,7 +12,7 @@ from clusters_unmixing.config import ExperimentConfig
 from clusters_unmixing.config.schema import BandRangeSpec, serialize_bands_ranges_key
 from clusters_unmixing.metrics import compute_correlation_matrix, summarize_correlation_matrix
 from clusters_unmixing.dataio import load_wavelength_and_cluster_matrix
-from clusters_unmixing.pipelines import run_correlation_experiments
+from clusters_unmixing.pipelines import run_experiments
 from clusters_unmixing.transforms import apply_normalization, apply_transform, select_wavelength_ranges
 pd.set_option('display.max_columns', 200)
 pd.set_option('display.width', 180)
@@ -213,9 +213,9 @@ def plot_pixel_preview(
     return fig
 
 
-def run_diagnostics_notebook(project_root: Path) -> None:
+def run_experiments_notebook(project_root: Path) -> None:
     experiment_config = ExperimentConfig.from_config_file(project_root)
-    result = run_correlation_experiments(experiment_config)
+    result = run_experiments(experiment_config)
     cluster_paths = {
         item.name: experiment_config.resolve_path(item.path)
         for item in experiment_config.cluster_sets
