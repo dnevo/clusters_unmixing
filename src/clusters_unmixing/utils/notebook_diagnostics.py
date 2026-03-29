@@ -164,7 +164,7 @@ def run_experiments_notebook(project_root: Path) -> None:
     abundance_preview_path = Path(result['model_evaluation']['abundance_preview_path'])
     correlation_summary_path = Path(result['correlation_summary_path'])
 
-    correlation_df = pd.read_csv(correlation_summary_path, index_col=['run_index', 'stage'])
+    correlation_df = pd.read_csv(correlation_summary_path, index_col=['run_index', 'metric', 'stage'])
     model_df = pd.read_csv(model_summary_path, index_col=['run_index', 'metric'])
     model_df.columns.name = 'model'
     abundance_df = pd.read_csv(abundance_preview_path, index_col='run_index')
@@ -237,7 +237,7 @@ def run_experiments_notebook(project_root: Path) -> None:
 
         abundance_rows = abundance_df.loc[[run_index]]
         display(Markdown('### Abundances'))
-        display(abundance_rows.reset_index(drop=True))
+        display(abundance_rows.reset_index(drop=True).style.hide(axis='index'))
 
         display(Markdown('### Synthetic pixel spectra preview'))
         for pixel_index in sorted(abundance_rows['pixel_index'].astype(int).unique()):

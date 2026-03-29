@@ -97,12 +97,14 @@ def _abundance_preview_row(
     source: str,
     abundances: np.ndarray,
     rmse_vs_true: float,
+    reconstruction_rmse: float,
 ) -> dict[str, Any]:
     row = {
         'run_index': run_index,
         'pixel_index': pixel_index,
         'source': source,
-        'abundance_rmse_vs_true': rmse_vs_true,
+        'abundance_rmse': rmse_vs_true,
+        'reconstruction_rmse': reconstruction_rmse,
     }
     for j, value in enumerate(abundances, start=1):
         row[f'endmember_{j}'] = float(value)
@@ -112,7 +114,6 @@ def run_experiments(exp: ExperimentConfig) -> dict[str, Any]:
     output_dir = exp.experiment_output_dir
     output_dir.mkdir(parents=True, exist_ok=True)
     runs = _planned_model_runs(exp)
-    summary_metric = 'cosine' if 'cosine' in exp.metrics else (exp.metrics[0] if exp.metrics else 'cosine')
 
     correlation_summary_rows: list[dict[str, Any]] = []
     model_rows: list[dict[str, Any]] = []
@@ -150,13 +151,15 @@ def run_experiments(exp: ExperimentConfig) -> dict[str, Any]:
             raw_pixels,
         )
         _, projected_endmembers, projected_pixels = stage_projections[-1]
-        for stage_name, stage_endmembers, _ in stage_projections:
-            matrix = compute_correlation_matrix(stage_endmembers, summary_metric)
-            correlation_summary_rows.append({
-                'run_index': idx,
-                'stage': stage_name,
-                **summarize_correlation_matrix(matrix),
-            })
+        for metric_name in exp.metrics:
+            for stage_name, stage_endmembers, _ in stage_projections:
+                matrix = compute_correlation_matrix(stage_endmembers, metric_name)
+                correlation_summary_rows.append({
+                    'run_index': idx,
+                    'metric': metric_name,
+                    'stage': stage_name,
+                    **summarize_correlation_matrix(matrix),
+                })
 
         endmembers_t = torch.tensor(projected_endmembers, dtype=torch.float32, device=device)
         projected_pixels_t = torch.tensor(projected_pixels, dtype=torch.float32, device=device)
@@ -168,7 +171,14 @@ def run_experiments(exp: ExperimentConfig) -> dict[str, Any]:
             preview_pixels = np.random.choice(n_preview_available, size=preview_limit, replace=False).astype(int).tolist()
             preview_pixels.sort()
             abundance_preview_rows.extend(
-                _abundance_preview_row(idx, sample_idx, 'true', true_abundances[sample_idx], 0.0)
+                _abundance_preview_row(
+                    idx,
+                    sample_idx,
+                    'true',
+                    true_abundances[sample_idx],
+                    0.0,
+                    float(np.sqrt(np.mean(np.square((true_abundances[sample_idx] @ projected_endmembers) - projected_pixels[sample_idx])))),
+                )
                 for sample_idx in preview_pixels
             )
 
@@ -182,9 +192,11 @@ def run_experiments(exp: ExperimentConfig) -> dict[str, Any]:
                 params=model_spec['params'],
             )
             abundances = abundances_t.detach().cpu().numpy()
-            rmse = float(np.sqrt(np.mean(np.square(abundances - true_abundances))))
-            mae = float(np.mean(np.abs(abundances - true_abundances)))
-            for metric_name, value in [('abundance_rmse', rmse), ('abundance_mae', mae)]:
+            reconstructed_pixels = abundances @ projected_endmembers
+            for metric_name, value in [
+                ('abundance_rmse', float(np.sqrt(np.mean(np.square(abundances - true_abundances))))),
+                ('reconstruction_rmse', float(np.sqrt(np.mean(np.square(reconstructed_pixels - projected_pixels))))),
+            ]:
                 model_rows.append({
                     'run_index': idx,
                     'model': model_spec['name'],
@@ -200,6 +212,7 @@ def run_experiments(exp: ExperimentConfig) -> dict[str, Any]:
                         model_spec['name'],
                         pred_abundances,
                         float(np.sqrt(np.mean(np.square(pred_abundances - true_abundances[sample_idx])))),
+                        float(np.sqrt(np.mean(np.square((pred_abundances @ projected_endmembers) - projected_pixels[sample_idx])))),
                     )
                 )
 

@@ -19,5 +19,5 @@
 - `transforms/spectral_views.py`
 - `transforms/normalization.py`
 - `metrics.py`
-- `pipelines/correlation_pipeline.py`
+- `pipelines/experiment_pipeline.py`
 - `utils/notebook_diagnostics.py`

@@ -31,7 +31,7 @@ The default experiment configuration lives in `experiments/configs/configuration
 - `transforms/spectral_views.py`: wavelength selection and transform steps
 - `transforms/normalization.py`: normalization helpers
 - `metrics.py`: correlation metric computation and summary helpers
-- `pipelines/correlation_pipeline.py`: experiment execution pipeline exposed as `run_experiments`
+- `pipelines/experiment_pipeline.py`: experiment execution pipeline exposed as `run_experiments`
 - `utils/notebook_diagnostics.py`: notebook orchestration, tables, and plotting helpers
 - `models/runner_registry.py`: model registry and dispatch
 - `models/sunsal.py`, `models/vpgdu.py`, `models/small_mlp.py`: unmixing model implementations
@@ -68,7 +68,7 @@ Key sections in the config:
 
 - `experiment_name`: output folder name under `experiments/outputs/`
 - `cluster_sets`: available input cluster CSV files
-- `metrics`: correlation metrics to compute for projected endmembers
+- `metrics`: required non-empty list of correlation metrics to compute for projected endmembers (`cosine`, `sam`)
 - `model_evaluation.models`: model hyperparameters keyed by model name
 - `model_evaluation.runs`: concrete experiment runs including bands, normalization, transforms, noise level, pixel count, and selected models
 
@@ -84,9 +84,9 @@ Each run batch writes results under:
 
 At a high level:
 
-- `correlation_summary.csv` stores per-run, per-stage correlation statistics (`raw`, `normalized`, and any configured transform stages such as `pca`)
-- `model_summary.csv` stores per-model evaluation metrics and selected runtime metadata
-- `abundance_preview.csv` stores sampled true vs. estimated abundances used by the notebook previews
+- `correlation_summary.csv` stores per-run, per-metric, per-stage correlation statistics (`raw`, `normalized`, and any configured transform stages such as `pca`)
+- `model_summary.csv` stores one row per run and metric, with one column per configured model
+- `abundance_preview.csv` stores the notebook-ready abundance preview table with `pixel_index`, `source`, error columns, and `endmember_*` values
 
 ## Notes
 

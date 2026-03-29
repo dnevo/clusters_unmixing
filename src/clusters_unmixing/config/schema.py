@@ -11,6 +11,7 @@ TransformStepSpec = tuple[str, dict[str, Any]]
 
 
 ALLOWED_MODEL_NAMES = {"sunsal", "vpgdu", "small_mlp"}
+ALLOWED_CORRELATION_METRICS = {"cosine", "sam"}
 
 
 class SmallMLPParamsModel(BaseModel):
@@ -227,9 +228,22 @@ class ExperimentConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
     experiment_name: str = "correlation_experiment"
     cluster_sets: list[ClusterSetConfig]
-    metrics: list[str] = Field(default_factory=lambda: ["cosine", "sam"])
+    metrics: list[str]
     model_evaluation: ModelEvaluationConfig
     project_root: Path
+
+    @field_validator("metrics")
+    @classmethod
+    def _validate_metrics(cls, value: list[str]) -> list[str]:
+        if not value:
+            raise ValueError("Experiment 'metrics' must be non-empty")
+        normalized = [item.strip().lower() for item in value if item.strip()]
+        if len(normalized) != len(value):
+            raise ValueError("Experiment 'metrics' entries must be non-empty strings")
+        invalid = [name for name in normalized if name not in ALLOWED_CORRELATION_METRICS]
+        if invalid:
+            raise ValueError(f"Unsupported correlation metrics: {sorted(set(invalid))}")
+        return normalized
 
     @classmethod
     def from_dict(cls, raw: dict[str, Any], project_root: Path) -> "ExperimentConfig":
