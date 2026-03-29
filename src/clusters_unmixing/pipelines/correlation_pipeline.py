@@ -35,12 +35,12 @@ def _planned_model_runs(exp: ExperimentConfig) -> list[dict[str, Any]]:
         })
     return runs
 
-def _build_projection(
+def _build_stage_projections(
     run: dict[str, Any],
     wavelengths: np.ndarray,
     raw_endmembers: np.ndarray,
     raw_pixels: np.ndarray,
-) -> tuple[np.ndarray, np.ndarray]:
+) -> list[tuple[str, np.ndarray, np.ndarray]]:
     wavelengths_sel, selected_endmembers = select_wavelength_ranges(
         wavelengths,
         raw_endmembers,
@@ -51,17 +51,23 @@ def _build_projection(
         raw_pixels,
         run["bands_ranges"],
     )
+    projections: list[tuple[str, np.ndarray, np.ndarray]] = [
+        ("raw", selected_endmembers, selected_pixels)
+    ]
+
     projected_endmembers, projected_pixels = apply_normalization(
         selected_endmembers,
         selected_pixels,
         wavelengths_sel,
         run["normalization"],
     )
+    projections.append(("normalized", projected_endmembers, projected_pixels))
 
     for name, params in run["transform_steps"]:
         projected_endmembers, projected_pixels = apply_transform(projected_endmembers, projected_pixels, name, params)
+        projections.append((name, projected_endmembers, projected_pixels))
 
-    return projected_endmembers, projected_pixels
+    return projections
 
 def _set_global_seeds(seed: int) -> None:
     random.seed(seed)
@@ -91,17 +97,17 @@ def run_experiments(exp: ExperimentConfig) -> dict[str, Any]:
     output_dir.mkdir(parents=True, exist_ok=True)
     runs = _planned_model_runs(exp)
 
-    summary_rows: list[dict[str, Any]] = []
+    correlation_summary_rows: list[dict[str, Any]] = []
     model_rows: list[dict[str, Any]] = []
     abundance_preview_rows: list[dict[str, Any]] = []
 
     if not runs:
-        summary_path = output_dir / 'correlation_summary.csv'
-        pd.DataFrame(summary_rows).to_csv(summary_path, index=False)
+        correlation_summary_path = output_dir / 'correlation_summary.csv'
+        pd.DataFrame(correlation_summary_rows).to_csv(correlation_summary_path, index=False)
         return {
             'experiment_name': exp.experiment_name,
             'output_dir': str(output_dir),
-            'summary_path': str(summary_path),
+            'correlation_summary_path': str(correlation_summary_path),
             'n_runs': 0,
             'model_evaluation': {'n_runs': 0},
         }
@@ -120,25 +126,28 @@ def run_experiments(exp: ExperimentConfig) -> dict[str, Any]:
             run["snr_db"],
         )
 
-        projected_endmembers, projected_pixels = _build_projection(
+        stage_projections = _build_stage_projections(
             run,
             wavelengths,
             raw_endmembers,
             raw_pixels,
         )
+        _, projected_endmembers, projected_pixels = stage_projections[-1]
         for metric in exp.metrics:
-            matrix = compute_correlation_matrix(projected_endmembers, metric)
-            stats = summarize_correlation_matrix(matrix)
-            row = {
-                'run_index': idx,
-                'cluster_set': run['cluster_set'],
-                'bands_ranges': run['bands_ranges_key'],
-                'normalization': run['normalization'],
-                'transform': run['transform'],
-                'metric': metric,
-                **stats,
-            }
-            summary_rows.append(row)
+            for stage_name, stage_endmembers, _ in stage_projections:
+                matrix = compute_correlation_matrix(stage_endmembers, metric)
+                stats = summarize_correlation_matrix(matrix)
+                row = {
+                    'run_index': idx,
+                    'cluster_set': run['cluster_set'],
+                    'bands_ranges': run['bands_ranges_key'],
+                    'normalization': run['normalization'],
+                    'transform': run['transform'],
+                    'stage': stage_name,
+                    'metric': metric,
+                    **stats,
+                }
+                correlation_summary_rows.append(row)
 
         endmembers_t = torch.tensor(projected_endmembers, dtype=torch.float32, device=device)
         projected_pixels_t = torch.tensor(projected_pixels, dtype=torch.float32, device=device)
@@ -193,20 +202,20 @@ def run_experiments(exp: ExperimentConfig) -> dict[str, Any]:
                     row[f'est_a{j}'] = float(value)
                 abundance_preview_rows.append(row)
 
-    summary_path = output_dir / 'correlation_summary.csv'
+    correlation_summary_path = output_dir / 'correlation_summary.csv'
     model_summary_path = output_dir / 'model_summary.csv'
     abundance_preview_path = output_dir / 'abundance_preview.csv'
-    pd.DataFrame(summary_rows).to_csv(summary_path, index=False)
+    pd.DataFrame(correlation_summary_rows).to_csv(correlation_summary_path, index=False)
     pd.DataFrame(model_rows).to_csv(model_summary_path, index=False)
     pd.DataFrame(abundance_preview_rows).to_csv(abundance_preview_path, index=False)
     return {
         'experiment_name': exp.experiment_name,
         'output_dir': str(output_dir),
-        'summary_path': str(summary_path),
+        'correlation_summary_path': str(correlation_summary_path),
         'n_runs': len(runs),
         'model_evaluation': {
             'n_runs': len(runs),
-            'summary_path': str(model_summary_path),
+            'model_summary_path': str(model_summary_path),
             'abundance_preview_path': str(abundance_preview_path),
         },
     }

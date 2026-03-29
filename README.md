@@ -84,7 +84,7 @@ Each run batch writes results under:
 
 At a high level:
 
-- `correlation_summary.csv` stores per-run correlation statistics for the projected endmembers
+- `correlation_summary.csv` stores per-run, per-stage correlation statistics (`raw`, `normalized`, and any configured transform stages such as `pca`)
 - `model_summary.csv` stores per-model evaluation metrics and selected runtime metadata
 - `abundance_preview.csv` stores sampled true vs. estimated abundances used by the notebook previews
 

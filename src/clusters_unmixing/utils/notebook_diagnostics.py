@@ -221,7 +221,7 @@ def run_experiments_notebook(project_root: Path) -> None:
         for item in experiment_config.cluster_sets
     }
 
-    model_summary_path = Path(result['model_evaluation']['summary_path'])
+    model_summary_path = Path(result['model_evaluation']['model_summary_path'])
     abundance_preview_path = Path(result['model_evaluation']['abundance_preview_path'])
 
     model_df = pd.read_csv(model_summary_path)
