@@ -9,59 +9,12 @@ import plotly.graph_objects as go
 from IPython.display import Markdown, display
 
 from clusters_unmixing.config import ExperimentConfig
-from clusters_unmixing.config.schema import BandRangeSpec, serialize_bands_ranges_key
-from clusters_unmixing.metrics import compute_correlation_matrix, summarize_correlation_matrix
+from clusters_unmixing.config.schema import BandRangeSpec
 from clusters_unmixing.dataio import load_wavelength_and_cluster_matrix
 from clusters_unmixing.pipelines import run_experiments
-from clusters_unmixing.transforms import apply_normalization, apply_transform, select_wavelength_ranges
+from clusters_unmixing.transforms import apply_normalization
 pd.set_option('display.max_columns', 200)
 pd.set_option('display.width', 180)
-
-def _resolve_abundance_columns(abundance_df: pd.DataFrame) -> tuple[list[str], list[str]]:
-    true_cols = [c for c in abundance_df.columns if c.startswith('true_a')]
-    pred_cols = [c for c in abundance_df.columns if c.startswith('est_a')]
-    true_cols = sorted(true_cols, key=lambda c: int(''.join(ch for ch in c if ch.isdigit()) or 0))
-    pred_cols = sorted(pred_cols, key=lambda c: int(''.join(ch for ch in c if ch.isdigit()) or 0))
-    return true_cols, pred_cols
-
-
-def build_abundance_comparison_tables(abundance_df: pd.DataFrame, max_pixels: int = 5) -> list[dict[str, Any]]:
-    true_cols, pred_cols = _resolve_abundance_columns(abundance_df)
-
-    pixel_ids = sorted(int(v) for v in abundance_df['pixel_index'].dropna().unique())[:max_pixels]
-    tables: list[dict[str, Any]] = []
-    for pixel_index in pixel_ids:
-        pixel_rows = abundance_df[abundance_df['pixel_index'].astype(int) == int(pixel_index)].copy()
-        if pixel_rows.empty:
-            continue
-        true_vals = [float(pixel_rows.iloc[0][c]) for c in true_cols]
-        rows: list[dict[str, Any]] = [{
-            'source': 'true',
-            'abundance_rmse_vs_true': 0.0,
-            **{f'endmember_{j}': value for j, value in enumerate(true_vals, start=1)},
-        }]
-        for _, row in pixel_rows.sort_values('model').iterrows():
-            pred_vals = [float(row[c]) for c in pred_cols]
-            true_arr = pd.Series(true_vals, dtype=float).to_numpy()
-            pred_arr = pd.Series(pred_vals, dtype=float).to_numpy()
-            rmse = float(((pred_arr - true_arr) ** 2).mean() ** 0.5)
-            rows.append({
-                'source': str(row['model']),
-                'abundance_rmse_vs_true': rmse,
-                **{f'endmember_{j}': value for j, value in enumerate(pred_vals, start=1)},
-            })
-        tables.append({
-            'pixel_index': pixel_index,
-            'table': pd.DataFrame(rows).round(6),
-        })
-    return tables
-
-
-def display_abundance_comparison_tables(abundance_df: pd.DataFrame, max_pixels: int = 5) -> None:
-    tables = build_abundance_comparison_tables(abundance_df=abundance_df, max_pixels=max_pixels)
-    for item in tables:
-        display(Markdown(f"### Abundances  |  pixel_index={item['pixel_index']}"))
-        display(item['table'])
 
 
 def plot_cluster_overview(
@@ -151,22 +104,8 @@ def plot_cluster_overview(
     return fig
 
 
-def cosine_offdiag_stats(endmembers: np.ndarray) -> dict[str, float]:
-    matrix = compute_correlation_matrix(endmembers, metric="cosine")
-    return summarize_correlation_matrix(matrix)
-
-
-def stats_table(rows: dict[str, dict[str, float]]) -> pd.DataFrame:
-    return pd.DataFrame.from_dict(rows, orient='index').rename_axis('stage').round(6)
-
-
-def format_model_metrics_table(model_df: pd.DataFrame) -> pd.DataFrame:
-    pivot = model_df.pivot_table(index='metric', columns='model', values='mean', aggfunc='first')
-    return pivot.sort_index().round(6)
-
-
-def abundance_vector(row: pd.Series, prefix: str) -> np.ndarray:
-    cols = sorted([c for c in row.index if str(c).startswith(prefix)])
+def abundance_vector(row: pd.Series) -> np.ndarray:
+    cols = sorted([c for c in row.index if str(c).startswith('endmember_')])
     return row[cols].to_numpy(dtype=float)
 
 
@@ -177,12 +116,12 @@ def plot_pixel_preview(
     abundance_rows: pd.DataFrame,
     snr_db: float,
 ) -> go.Figure:
-    pixel_rows = abundance_rows[abundance_rows['pixel_index'] == pixel_index].sort_values('model').copy()
+    pixel_rows = abundance_rows[abundance_rows['pixel_index'] == pixel_index].sort_values('source').copy()
     if pixel_rows.empty:
         raise ValueError(f'No abundance rows found for pixel_index={pixel_index}')
 
-    reference_row = pixel_rows.iloc[0]
-    a_true = abundance_vector(reference_row, 'true_a')
+    reference_row = pixel_rows[pixel_rows['source'] == 'true'].iloc[0]
+    a_true = abundance_vector(reference_row)
     y_clean = np.asarray(a_true @ endmembers_full, dtype=float)
     if np.isinf(float(snr_db)):
         y_noisy = y_clean.copy()
@@ -196,9 +135,9 @@ def plot_pixel_preview(
     fig = go.Figure()
     fig.add_scatter(x=wavelength_axis_full, y=y_clean, mode='lines', name='without_noise')
     fig.add_scatter(x=wavelength_axis_full, y=y_noisy, mode='lines', name='with_noise', line=dict(dash='dash'))
-    for _, row in pixel_rows.iterrows():
-        model_name = str(row['model'])
-        a_est = abundance_vector(row, 'est_a')
+    for _, row in pixel_rows[pixel_rows['source'] != 'true'].iterrows():
+        model_name = str(row['source'])
+        a_est = abundance_vector(row)
         y_est = np.asarray(a_est @ endmembers_full, dtype=float)
         fig.add_scatter(x=wavelength_axis_full, y=y_est, mode='lines', name=model_name)
 
@@ -223,9 +162,12 @@ def run_experiments_notebook(project_root: Path) -> None:
 
     model_summary_path = Path(result['model_evaluation']['model_summary_path'])
     abundance_preview_path = Path(result['model_evaluation']['abundance_preview_path'])
+    correlation_summary_path = Path(result['correlation_summary_path'])
 
-    model_df = pd.read_csv(model_summary_path)
-    abundance_df = pd.read_csv(abundance_preview_path)
+    correlation_df = pd.read_csv(correlation_summary_path, index_col=['run_index', 'stage'])
+    model_df = pd.read_csv(model_summary_path, index_col=['run_index', 'metric'])
+    model_df.columns.name = 'model'
+    abundance_df = pd.read_csv(abundance_preview_path, index_col='run_index')
 
     display(Markdown(f"**Experiment name:** `{result['experiment_name']}`\n\n**Output dir:** `{result['output_dir']}`"))
 
@@ -236,10 +178,8 @@ def run_experiments_notebook(project_root: Path) -> None:
         cluster_set = run_cfg.cluster_set
         bands_ranges = run_cfg.normalized_bands_ranges()
         normalization = run_cfg.normalization
-        transform_steps = run_cfg.normalized_transform_steps()
         transform_label = run_cfg.normalized_transform()
         snr_db = run_cfg.snr_db
-        bands_key = serialize_bands_ranges_key(bands_ranges)
 
         bands_label = ", ".join(
             f"{x_min:g}-{x_max:g} {reduce}"
@@ -280,21 +220,8 @@ def run_experiments_notebook(project_root: Path) -> None:
             y_title='Reflectance',
         ))
 
-        _, raw_endmembers_selected = select_wavelength_ranges(
-            wavelengths=wavelength_axis_full,
-            endmembers=endmembers_full,
-            bands_ranges=bands_ranges,
-        )
-        stats_payload = {'raw': cosine_offdiag_stats(raw_endmembers_selected)}
-
         normalized_endmembers_full, _ = apply_normalization(endmembers_full, endmembers_full, wavelength_axis_full, normalization)
-        _, normalized_endmembers_selected = select_wavelength_ranges(
-            wavelengths=wavelength_axis_full,
-            endmembers=normalized_endmembers_full,
-            bands_ranges=bands_ranges,
-        )
         if normalization != 'without':
-            stats_payload['normalized'] = cosine_offdiag_stats(normalized_endmembers_selected)
             display(plot_cluster_overview(
                 wavelength_axis=wavelength_axis_full,
                 endmembers=normalized_endmembers_full,
@@ -303,39 +230,21 @@ def run_experiments_notebook(project_root: Path) -> None:
                 bands_ranges=bands_ranges,
             ))
 
-        transformed_endmembers = normalized_endmembers_selected
-        for step_name, step_params in transform_steps:
-            transformed_endmembers, _ = apply_transform(transformed_endmembers, transformed_endmembers, kind=step_name, params=step_params)
-            stats_payload[step_name] = cosine_offdiag_stats(transformed_endmembers)
+        display(correlation_df.loc[run_index])
 
-        display(stats_table(stats_payload))
-
-        model_rows = model_df[
-            (model_df['cluster_set'] == cluster_set)
-            & (model_df['bands_ranges'] == bands_key)
-            & (model_df['normalization'] == normalization)
-            & (model_df['transform'] == transform_label)
-            & (model_df['snr_db'].astype(float) == float(snr_db))
-        ].copy()
         display(Markdown('### Model metrics'))
-        display(format_model_metrics_table(model_rows))
+        display(model_df.loc[run_index])
 
-        abundance_rows = abundance_df[
-            (abundance_df['cluster_set'] == cluster_set)
-            & (abundance_df['bands_ranges'] == bands_key)
-            & (abundance_df['normalization'] == normalization)
-            & (abundance_df['transform'] == transform_label)
-            & (abundance_df['snr_db'].astype(float) == float(snr_db))
-        ].copy()
-        display_abundance_comparison_tables(abundance_rows, max_pixels=5)
+        abundance_rows = abundance_df.loc[[run_index]]
+        display(Markdown('### Abundances'))
+        display(abundance_rows.reset_index(drop=True))
 
         display(Markdown('### Synthetic pixel spectra preview'))
-        endmembers_full_for_plot, _ = apply_normalization(endmembers_full, endmembers_full, wavelength_axis_full, normalization)
         for pixel_index in sorted(abundance_rows['pixel_index'].astype(int).unique()):
             display(plot_pixel_preview(
                 pixel_index=pixel_index,
                 wavelength_axis_full=wavelength_axis_full,
-                endmembers_full=endmembers_full_for_plot,
+                endmembers_full=normalized_endmembers_full,
                 abundance_rows=abundance_rows,
                 snr_db=snr_db,
             ))
