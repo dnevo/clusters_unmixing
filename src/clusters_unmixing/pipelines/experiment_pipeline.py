@@ -144,9 +144,7 @@ def run_experiments(exp: ExperimentConfig) -> dict[str, Any]:
                 })
 
 
-        n_preview_available = int(true_abundances.shape[0])
-        preview_limit = min(5, n_preview_available)
-        preview_pixels = np.random.choice(n_preview_available, size=preview_limit, replace=False).astype(int).tolist()
+        preview_pixels = np.random.choice(true_abundances.shape[0], size=5, replace=False).tolist()
         preview_pixels.sort()
         abundance_preview_rows.extend(
             _abundance_preview_row(

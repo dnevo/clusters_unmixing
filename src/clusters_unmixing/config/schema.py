@@ -139,17 +139,9 @@ class ModelRunConfig(BaseModel):
     @field_validator("num_pixels")
     @classmethod
     def _validate_num_pixels(cls, value: int) -> int:
-        if value <= 0:
-            raise ValueError("Model run 'num_pixels' must be > 0")
+        if value <= 10:
+            raise ValueError("Model run 'num_pixels' must be > 10")
         return value
-
-    @model_validator(mode="after")
-    def _validate_small_mlp_split_requirements(self) -> "ModelRunConfig":
-        if "small_mlp" in self.normalized_models() and self.num_pixels < 5:
-            raise ValueError(
-                "small_mlp requires num_pixels >= 5 so the 70%/20%/10% train/validation/test split is non-empty"
-            )
-        return self
 
     @field_validator("normalization")
     @classmethod
