@@ -3,6 +3,10 @@ from __future__ import annotations
 import numpy as np
 
 
+def rmse(values: np.ndarray, reference: np.ndarray) -> float:
+    return float(np.sqrt(np.mean(np.square(np.asarray(values) - np.asarray(reference)))))
+
+
 def _cosine_similarity_matrix(endmembers: np.ndarray) -> np.ndarray:
     norms = np.linalg.norm(endmembers, axis=1, keepdims=True)
     norms = np.clip(norms, 1e-12, None)

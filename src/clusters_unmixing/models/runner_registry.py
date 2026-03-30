@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
+import numpy as np
 import torch
 
 from .small_mlp import SmallMLPConfig, SmallMLPUnmixing
@@ -56,12 +57,18 @@ def available_models() -> list[str]:
 
 def run_registered_model(
     model_name: str,
-    endmembers: torch.Tensor,
-    pixels: torch.Tensor,
-    true_abundances: torch.Tensor,
-    params: dict[str, Any] | None = None,
-) -> tuple[torch.Tensor, dict[str, Any]]:
-    key = model_name.strip().lower()
-    if key not in _MODEL_REGISTRY:
-        raise ValueError(f"Unsupported model '{model_name}'. Available models: {available_models()}")
-    return _MODEL_REGISTRY[key](endmembers, pixels, true_abundances, {} if params is None else dict(params))
+    endmembers: np.ndarray,
+    pixels: np.ndarray,
+    true_abundances: np.ndarray,
+    params: dict[str, Any],
+) -> tuple[np.ndarray, dict[str, Any]]:
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    endmembers_t = torch.tensor(endmembers, dtype=torch.float32, device=device)
+    pixels_t = torch.tensor(pixels, dtype=torch.float32, device=device)
+    true_abundances_t = torch.tensor(true_abundances, dtype=torch.float32, device=device)
+    predicted_abundances_t, diagnostics_dict = _MODEL_REGISTRY[model_name](endmembers_t, pixels_t, true_abundances_t, params)
+    predicted_abundances = predicted_abundances_t.detach().cpu().numpy()
+ 
+    return predicted_abundances, diagnostics_dict

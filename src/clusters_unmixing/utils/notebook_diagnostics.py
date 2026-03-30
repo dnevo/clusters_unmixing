@@ -48,7 +48,10 @@ def plot_cluster_overview(
 
     point_kind = np.full(len(wavelength_axis_arr), 'outside', dtype=object)
     for x_min, x_max, reduce in bands_ranges or []:
-        mask = (wavelength_axis_arr >= float(x_min)) & (wavelength_axis_arr <= float(x_max))
+        mask = np.logical_and(
+            np.greater_equal(wavelength_axis_arr, float(x_min)),
+            np.less_equal(wavelength_axis_arr, float(x_max)),
+        )
         point_kind[mask] = 'mean' if reduce == 'mean' else 'none'
 
     palette = [

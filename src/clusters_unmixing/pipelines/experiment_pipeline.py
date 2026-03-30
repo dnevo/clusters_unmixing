@@ -10,28 +10,25 @@ import torch
 from clusters_unmixing.config.schema import ExperimentConfig
 from clusters_unmixing.data import generate_samples
 from clusters_unmixing.dataio import load_wavelength_and_cluster_matrix
-from clusters_unmixing.metrics import compute_correlation_matrix, summarize_correlation_matrix
+from clusters_unmixing.metrics import compute_correlation_matrix, rmse, summarize_correlation_matrix
 from clusters_unmixing.models.runner_registry import run_registered_model
 from clusters_unmixing.transforms.normalization import apply_normalization
 from clusters_unmixing.transforms.spectral_views import apply_transform, select_wavelength_ranges
 
 def _planned_model_runs(exp: ExperimentConfig) -> list[dict[str, Any]]:
-    model_eval = exp.model_evaluation
-    model_params = {model.normalized_name(): dict(model.params) for model in model_eval.models}
-    runs = []
-    for item in model_eval.runs:
-        bands_ranges = item.normalized_bands_ranges()
-        runs.append({
+    model_params = {model.name: dict(model.params) for model in exp.model_evaluation.models}
+    return [
+        {
             "cluster_set": item.cluster_set,
-            "bands_ranges": bands_ranges,
+            "bands_ranges": item.normalized_bands_ranges(),
             "normalization": item.normalization,
-            "transform": item.normalized_transform(),
             "transform_steps": item.normalized_transform_steps(),
             "models": [{"name": name, "params": dict(model_params[name])} for name in item.normalized_models()],
             "num_pixels": item.num_pixels,
             "snr_db": item.snr_db,
-        })
-    return runs
+        }
+        for item in exp.model_evaluation.runs
+    ]
 
 def _build_stage_projections(
     run: dict[str, Any],
@@ -96,19 +93,17 @@ def _abundance_preview_row(
     pixel_index: int,
     source: str,
     abundances: np.ndarray,
-    rmse_vs_true: float,
+    abundance_rmse: float,
     reconstruction_rmse: float,
 ) -> dict[str, Any]:
-    row = {
+    return {
         'run_index': run_index,
         'pixel_index': pixel_index,
         'source': source,
-        'abundance_rmse': rmse_vs_true,
+        'abundance_rmse': abundance_rmse,
         'reconstruction_rmse': reconstruction_rmse,
+        **{f'endmember_{j}': float(value) for j, value in enumerate(abundances, start=1)},
     }
-    for j, value in enumerate(abundances, start=1):
-        row[f'endmember_{j}'] = float(value)
-    return row
 
 def run_experiments(exp: ExperimentConfig) -> dict[str, Any]:
     output_dir = exp.experiment_output_dir
@@ -116,21 +111,8 @@ def run_experiments(exp: ExperimentConfig) -> dict[str, Any]:
     runs = _planned_model_runs(exp)
 
     correlation_summary_rows: list[dict[str, Any]] = []
-    model_rows: list[dict[str, Any]] = []
+    model_summary_rows: list[dict[str, Any]] = []
     abundance_preview_rows: list[dict[str, Any]] = []
-
-    if not runs:
-        correlation_summary_path = output_dir / 'correlation_summary.csv'
-        pd.DataFrame(correlation_summary_rows).to_csv(correlation_summary_path, index=False)
-        return {
-            'experiment_name': exp.experiment_name,
-            'output_dir': str(output_dir),
-            'correlation_summary_path': str(correlation_summary_path),
-            'n_runs': 0,
-            'model_evaluation': {'n_runs': 0},
-        }
-
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     for idx, run in enumerate(runs, start=1):
         cluster_cfg = next(item for item in exp.cluster_sets if item.name == run["cluster_set"])
@@ -161,43 +143,38 @@ def run_experiments(exp: ExperimentConfig) -> dict[str, Any]:
                     **summarize_correlation_matrix(matrix),
                 })
 
-        endmembers_t = torch.tensor(projected_endmembers, dtype=torch.float32, device=device)
-        projected_pixels_t = torch.tensor(projected_pixels, dtype=torch.float32, device=device)
 
         n_preview_available = int(true_abundances.shape[0])
-        preview_pixels: list[int] = []
-        if n_preview_available > 0:
-            preview_limit = min(5, n_preview_available)
-            preview_pixels = np.random.choice(n_preview_available, size=preview_limit, replace=False).astype(int).tolist()
-            preview_pixels.sort()
-            abundance_preview_rows.extend(
-                _abundance_preview_row(
-                    idx,
-                    sample_idx,
-                    'true',
-                    true_abundances[sample_idx],
-                    0.0,
-                    float(np.sqrt(np.mean(np.square((true_abundances[sample_idx] @ projected_endmembers) - projected_pixels[sample_idx])))),
-                )
-                for sample_idx in preview_pixels
+        preview_limit = min(5, n_preview_available)
+        preview_pixels = np.random.choice(n_preview_available, size=preview_limit, replace=False).astype(int).tolist()
+        preview_pixels.sort()
+        abundance_preview_rows.extend(
+            _abundance_preview_row(
+                idx,
+                sample_idx,
+                'true',
+                true_abundances[sample_idx],
+                0.0,
+                rmse(true_abundances[sample_idx] @ projected_endmembers, projected_pixels[sample_idx]),
             )
+            for sample_idx in preview_pixels
+        )
 
         for model_spec in run['models']:
             _set_global_seeds(0)
-            abundances_t, _ = run_registered_model(
+            abundances, _ = run_registered_model(
                 model_name=model_spec['name'],
-                endmembers=endmembers_t,
-                pixels=projected_pixels_t,
-                true_abundances=torch.tensor(true_abundances, dtype=torch.float32, device=device),
+                endmembers=projected_endmembers,
+                pixels=projected_pixels,
+                true_abundances=true_abundances,
                 params=model_spec['params'],
             )
-            abundances = abundances_t.detach().cpu().numpy()
             reconstructed_pixels = abundances @ projected_endmembers
             for metric_name, value in [
-                ('abundance_rmse', float(np.sqrt(np.mean(np.square(abundances - true_abundances))))),
-                ('reconstruction_rmse', float(np.sqrt(np.mean(np.square(reconstructed_pixels - projected_pixels))))),
+                ('abundance_rmse', rmse(abundances, true_abundances)),
+                ('reconstruction_rmse', rmse(reconstructed_pixels, projected_pixels)),
             ]:
-                model_rows.append({
+                model_summary_rows.append({
                     'run_index': idx,
                     'model': model_spec['name'],
                     'metric': metric_name,
@@ -211,8 +188,8 @@ def run_experiments(exp: ExperimentConfig) -> dict[str, Any]:
                         sample_idx,
                         model_spec['name'],
                         pred_abundances,
-                        float(np.sqrt(np.mean(np.square(pred_abundances - true_abundances[sample_idx])))),
-                        float(np.sqrt(np.mean(np.square((pred_abundances @ projected_endmembers) - projected_pixels[sample_idx])))),
+                        rmse(pred_abundances, true_abundances[sample_idx]),
+                        rmse(pred_abundances @ projected_endmembers, projected_pixels[sample_idx]),
                     )
                 )
 
@@ -220,7 +197,7 @@ def run_experiments(exp: ExperimentConfig) -> dict[str, Any]:
     model_summary_path = output_dir / 'model_summary.csv'
     abundance_preview_path = output_dir / 'abundance_preview.csv'
     pd.DataFrame(correlation_summary_rows).to_csv(correlation_summary_path, index=False, float_format='%.6f')
-    pd.DataFrame(model_rows).pivot(index=['run_index', 'metric'], columns='model', values='mean').reset_index().to_csv(
+    pd.DataFrame(model_summary_rows).pivot(index=['run_index', 'metric'], columns='model', values='mean').reset_index().to_csv(
         model_summary_path, index=False, float_format='%.6f'
     )
     abundance_preview_df = pd.DataFrame(abundance_preview_rows).assign(
