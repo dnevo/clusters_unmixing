@@ -10,6 +10,7 @@ from IPython.display import Markdown, display
 
 from clusters_unmixing.config import ExperimentConfig
 from clusters_unmixing.config.schema import BandRangeSpec
+from clusters_unmixing.core_math import apply_snr_noise
 from clusters_unmixing.dataio import load_wavelength_and_cluster_matrix
 from clusters_unmixing.pipelines import run_experiments
 from clusters_unmixing.transforms import apply_normalization
@@ -126,14 +127,7 @@ def plot_pixel_preview(
     reference_row = pixel_rows[pixel_rows['source'] == 'true'].iloc[0]
     a_true = abundance_vector(reference_row)
     y_clean = np.asarray(a_true @ endmembers_full, dtype=float)
-    if np.isinf(float(snr_db)):
-        y_noisy = y_clean.copy()
-    else:
-        signal_power = float(np.mean(y_clean ** 2))
-        signal_rms = float(np.sqrt(max(signal_power, 0.0)))
-        noise_std = signal_rms * float(10.0 ** (-float(snr_db) / 20.0))
-        rng = np.random.default_rng(seed=int(pixel_index))
-        y_noisy = y_clean + rng.normal(loc=0.0, scale=noise_std, size=y_clean.shape)
+    y_noisy, _ = apply_snr_noise(y_clean, float(snr_db), seed=int(pixel_index))
 
     fig = go.Figure()
     fig.add_scatter(x=wavelength_axis_full, y=y_clean, mode='lines', name='without_noise')

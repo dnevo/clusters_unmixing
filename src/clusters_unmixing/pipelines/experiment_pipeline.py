@@ -8,9 +8,9 @@ import pandas as pd
 import torch
 
 from clusters_unmixing.config.schema import ExperimentConfig
+from clusters_unmixing.core_math import apply_snr_noise, compute_correlation_matrix, rmse, summarize_correlation_matrix
 from clusters_unmixing.data import generate_samples
 from clusters_unmixing.dataio import load_wavelength_and_cluster_matrix
-from clusters_unmixing.metrics import compute_correlation_matrix, rmse, summarize_correlation_matrix
 from clusters_unmixing.models.runner_registry import run_registered_model
 from clusters_unmixing.transforms.normalization import apply_normalization
 from clusters_unmixing.transforms.spectral_views import apply_transform, select_wavelength_ranges
@@ -70,7 +70,12 @@ def _set_global_seeds(seed: int) -> None:
     torch.manual_seed(seed)
 
 
-def _make_synthetic_pixels(endmembers: np.ndarray, num_pixels: int, snr_db: float) -> tuple[np.ndarray, np.ndarray]:
+def _make_synthetic_pixels(
+    endmembers: np.ndarray,
+    num_pixels: int,
+    snr_db: float,
+    seed: int | None = None,
+) -> tuple[np.ndarray, np.ndarray]:
     n_endmembers = endmembers.shape[0]
     abundances = generate_samples(
         num_samples=num_pixels,
@@ -78,13 +83,7 @@ def _make_synthetic_pixels(endmembers: np.ndarray, num_pixels: int, snr_db: floa
         num_endmembers=n_endmembers,
     )
     clean_pixels = abundances @ endmembers
-    if np.isinf(snr_db):
-        return clean_pixels, abundances
-    signal_power = float((clean_pixels ** 2).mean())
-    signal_rms = float(np.sqrt(max(signal_power, 0.0)))
-    noise_std = signal_rms * float(10.0 ** (-snr_db / 20.0))
-    noise = np.random.normal(loc=0.0, scale=1.0, size=clean_pixels.shape).astype(clean_pixels.dtype)
-    noisy_pixels = clean_pixels + (noise_std * noise)
+    noisy_pixels, _ = apply_snr_noise(clean_pixels, snr_db, seed=seed)
     return noisy_pixels, abundances
 
 
@@ -124,6 +123,7 @@ def run_experiments(exp: ExperimentConfig) -> dict[str, Any]:
             raw_endmembers,
             run["num_pixels"],
             run["snr_db"],
+            seed=0,
         )
 
         stage_projections = _build_stage_projections(

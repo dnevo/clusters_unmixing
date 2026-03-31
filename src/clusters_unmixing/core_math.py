@@ -7,6 +7,22 @@ def rmse(values: np.ndarray, reference: np.ndarray) -> float:
     return float(np.sqrt(np.mean(np.square(np.asarray(values) - np.asarray(reference)))))
 
 
+def apply_snr_noise(
+    clean_pixels: np.ndarray,
+    snr_db: float,
+    seed: int | None = None,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Centralized SNR application logic for both pipelines and diagnostics."""
+    if np.isinf(snr_db):
+        return clean_pixels, np.zeros_like(clean_pixels)
+
+    signal_power = float((clean_pixels ** 2).mean())
+    signal_rms = float(np.sqrt(max(signal_power, 1e-12)))
+    noise_std = signal_rms * float(10.0 ** (-snr_db / 20.0))
+    noise = np.random.normal(loc=0.0, scale=noise_std, size=clean_pixels.shape)
+    return clean_pixels + noise, noise
+
+
 def _cosine_similarity_matrix(endmembers: np.ndarray) -> np.ndarray:
     norms = np.linalg.norm(endmembers, axis=1, keepdims=True)
     norms = np.clip(norms, 1e-12, None)

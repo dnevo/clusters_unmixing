@@ -30,7 +30,7 @@ The default experiment configuration lives in `experiments/configs/configuration
 - `dataio.py`: cluster CSV loading
 - `transforms/spectral_views.py`: wavelength selection and transform steps
 - `transforms/normalization.py`: normalization helpers
-- `metrics.py`: correlation metric computation and summary helpers
+- `core_math.py`: correlation metric computation, SNR noise application, and shared numeric helpers
 - `pipelines/experiment_pipeline.py`: experiment execution pipeline exposed as `run_experiments`
 - `utils/notebook_diagnostics.py`: notebook orchestration, tables, and plotting helpers
 - `models/runner_registry.py`: model registry and dispatch

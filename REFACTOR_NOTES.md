@@ -18,6 +18,6 @@
 - `dataio.py`
 - `transforms/spectral_views.py`
 - `transforms/normalization.py`
-- `metrics.py`
+- `core_math.py`
 - `pipelines/experiment_pipeline.py`
 - `utils/notebook_diagnostics.py`

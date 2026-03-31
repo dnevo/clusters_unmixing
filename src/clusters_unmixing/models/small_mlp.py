@@ -42,7 +42,7 @@ class SmallMLPUnmixing:
 
     Expected shapes
     ---------------
-    endmembers : (bands, K)
+    endmembers : (K, bands)
     pixels : (N, bands)
     true_abundances : (N, K)
     """
@@ -79,11 +79,11 @@ class SmallMLPUnmixing:
         self,
         pixels: torch.Tensor,
         true_abundances: torch.Tensor,
-        endmembers_bands_k: torch.Tensor,
+        endmembers_k_bands: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         pred_abundances = self.model(pixels)
         abund_loss = F.mse_loss(pred_abundances, true_abundances)
-        recon_pixels = pred_abundances @ endmembers_bands_k.T
+        recon_pixels = pred_abundances @ endmembers_k_bands
         recon_loss = F.mse_loss(recon_pixels, pixels)
         total_loss = abund_loss + self.cfg.lambda_recon * recon_loss
         return total_loss, abund_loss, recon_loss, pred_abundances
@@ -93,12 +93,12 @@ class SmallMLPUnmixing:
         self,
         pixels: torch.Tensor,
         true_abundances: torch.Tensor,
-        endmembers_bands_k: torch.Tensor,
+        endmembers_k_bands: torch.Tensor,
     ) -> tuple[float, float, float]:
         total_loss, abund_loss, recon_loss, _ = self._compute_losses(
             pixels=pixels,
             true_abundances=true_abundances,
-            endmembers_bands_k=endmembers_bands_k,
+            endmembers_k_bands=endmembers_k_bands,
         )
         return float(total_loss.item()), float(abund_loss.item()), float(recon_loss.item())
 
@@ -113,13 +113,13 @@ class SmallMLPUnmixing:
         device = pixels.device
         dtype = pixels.dtype
 
-        endmembers_bands_k = endmembers.to(device=device, dtype=dtype).contiguous()
+        endmembers_k_bands = endmembers.to(device=device, dtype=dtype).contiguous()
         pixels_n_bands = pixels.to(device=device, dtype=dtype).contiguous()
         true_abundances_n_k = true_abundances.to(device=device, dtype=dtype).contiguous()
 
         n_samples = int(pixels_n_bands.shape[0])
         bands = int(pixels_n_bands.shape[1])
-        n_endmembers = int(endmembers_bands_k.shape[1])
+        n_endmembers = int(endmembers_k_bands.shape[0])
 
         train_count, val_count, test_count = self._split_counts(n_samples)
 
@@ -169,7 +169,7 @@ class SmallMLPUnmixing:
                 total_loss, abund_loss, recon_loss, _ = self._compute_losses(
                     pixels=batch_pixels,
                     true_abundances=batch_abundances,
-                    endmembers_bands_k=endmembers_bands_k,
+                    endmembers_k_bands=endmembers_k_bands,
                 )
                 total_loss.backward()
                 if cfg.clip_grad_norm > 0:
@@ -189,7 +189,7 @@ class SmallMLPUnmixing:
             val_loss, val_abund_loss, val_recon_loss = self._evaluate_split(
                 pixels=x_val,
                 true_abundances=y_val,
-                endmembers_bands_k=endmembers_bands_k,
+                endmembers_k_bands=endmembers_k_bands,
             )
 
             self.history["epoch"].append(epoch)
@@ -225,7 +225,7 @@ class SmallMLPUnmixing:
         self.test_loss, self.test_abund_loss, self.test_recon_loss = self._evaluate_split(
             pixels=x_test,
             true_abundances=y_test,
-            endmembers_bands_k=endmembers_bands_k,
+            endmembers_k_bands=endmembers_k_bands,
         )
 
         with torch.no_grad():

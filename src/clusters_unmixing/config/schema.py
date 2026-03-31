@@ -5,12 +5,12 @@ import yaml
 from pathlib import Path
 from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from clusters_unmixing.models.runner_registry import available_models
 
 BandRangeSpec = tuple[float, float, str]
 TransformStepSpec = tuple[str, dict[str, Any]]
 
 
-ALLOWED_MODEL_NAMES = {"sunsal", "vpgdu", "small_mlp"}
 ALLOWED_CORRELATION_METRICS = {"cosine", "sam"}
 
 
@@ -59,8 +59,9 @@ class ModelSpecConfig(BaseModel):
     @model_validator(mode="after")
     def _validate_params(self) -> "ModelSpecConfig":
         name = self.normalized_name()
-        if name not in ALLOWED_MODEL_NAMES:
-            raise ValueError(f"Unsupported model '{self.name}'. Allowed models: {sorted(ALLOWED_MODEL_NAMES)}")
+        valid_models = available_models()
+        if name not in valid_models:
+            raise ValueError(f"Unsupported model '{self.name}'. Registered models: {sorted(valid_models)}")
         if name == "small_mlp":
             self.params = SmallMLPParamsModel.model_validate(self.params).model_dump()
         return self
@@ -129,9 +130,9 @@ class ModelRunConfig(BaseModel):
         if not value:
             raise ValueError("Model run 'models' must be non-empty")
         normalized = [item.strip().lower() for item in value if item.strip()]
-        if len(normalized) != len(value):
-            raise ValueError("Model run 'models' entries must be non-empty strings")
-        invalid = [name for name in normalized if name not in ALLOWED_MODEL_NAMES]
+        
+        valid_models = available_models()
+        invalid = [name for name in normalized if name not in valid_models]
         if invalid:
             raise ValueError(f"Unsupported model names in run: {sorted(set(invalid))}")
         return normalized

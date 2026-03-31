@@ -29,13 +29,12 @@ def _run_vpgdu(endmembers: torch.Tensor, pixels: torch.Tensor, true_abundances: 
 
 
 def _run_small_mlp(endmembers: torch.Tensor, pixels: torch.Tensor, true_abundances: torch.Tensor, params: dict[str, Any]) -> tuple[torch.Tensor, dict[str, Any]]:
-    endmembers_bands_k = endmembers.T.contiguous()
     solver = SmallMLPUnmixing(
         SmallMLPConfig(**params),
         in_dim=int(pixels.shape[1]),
-        out_dim=int(endmembers_bands_k.shape[1]),
+        out_dim=int(endmembers.shape[0]),
     )
-    abundances = solver.solve(endmembers_bands_k, pixels, true_abundances)
+    abundances = solver.solve(endmembers, pixels, true_abundances)
     history = getattr(solver, "history", {}) or {}
     epochs = history.get("epoch") or []
     return abundances, {

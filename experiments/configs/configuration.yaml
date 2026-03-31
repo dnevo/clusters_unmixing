@@ -8,7 +8,7 @@ cluster_sets:
   - name: 6clusters_digitized
     path: data/6clusters_digitized.csv
 
-# Metrics implemented in src/clusters_unmixing/metrics.py
+# Metrics implemented in src/clusters_unmixing/core_math.py
 metrics:
   - cosine
   - sam
