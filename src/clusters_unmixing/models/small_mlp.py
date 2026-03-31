@@ -123,14 +123,19 @@ class SmallMLPUnmixing:
 
         train_count, val_count, test_count = self._split_counts(n_samples)
 
-        x_train = pixels_n_bands[:train_count]
-        y_train = true_abundances_n_k[:train_count]
+        # 1. Generate a random permutation of all indices
+        split_indices = torch.randperm(n_samples, device=device)
 
-        x_val = pixels_n_bands[train_count : train_count + val_count]
-        y_val = true_abundances_n_k[train_count : train_count + val_count]
+        # 2. Use the shuffled indices to create the splits
+        x_train = pixels_n_bands[split_indices[:train_count]]
+        y_train = true_abundances_n_k[split_indices[:train_count]]
 
-        x_test = pixels_n_bands[train_count + val_count :]
-        y_test = true_abundances_n_k[train_count + val_count :]
+        x_val = pixels_n_bands[split_indices[train_count : train_count + val_count]]
+        y_val = true_abundances_n_k[split_indices[train_count : train_count + val_count]]
+
+        x_test = pixels_n_bands[split_indices[train_count + val_count :]]
+        y_test = true_abundances_n_k[split_indices[train_count + val_count :]]
+
         if int(self.model.fc1.in_features) != bands or int(self.model.fc3.out_features) != n_endmembers:
             raise ValueError(
                 f"SmallMLPUnmixing was initialized for in_dim={self.model.fc1.in_features}, "

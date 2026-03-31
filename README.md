@@ -38,10 +38,16 @@ The default experiment configuration lives in `experiments/configs/configuration
 
 ## Run the project
 
-Install the package in editable mode:
+Install the core package in editable mode:
 
 ```bash
 python -m pip install -e .
+```
+
+Install notebook-only dependencies if you want to use the notebook or notebook smoke path:
+
+```bash
+python -m pip install ipython plotly
 ```
 
 Run the configured experiments:
@@ -57,6 +63,8 @@ python notebooks/_notebook_smoke.py
 ```
 
 Open `notebooks/00_clusters_unmixing_experiments.ipynb` for interactive review.
+
+If your editor reports unresolved imports for `plotly` or `IPython` in the notebook helpers, that usually means the notebook-only dependencies have not been installed into the active interpreter yet.
 
 ## Configuration model
 
@@ -91,5 +99,6 @@ At a high level:
 ## Notes
 
 - The experiment pipeline uses NumPy for synthetic sample generation and PyTorch for model execution.
-- The notebook helpers additionally rely on notebook/visualization packages such as `IPython` and `plotly`.
+- The notebook helpers additionally rely on optional notebook/visualization packages such as `IPython` and `plotly`.
+- The base project metadata keeps notebook dependencies separate from the core experiment pipeline install path.
 - The output root is fixed in code to `experiments/outputs`.

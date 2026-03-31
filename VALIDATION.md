@@ -9,12 +9,14 @@
 ## Validation commands
 ```bash
 python -m pip install -e .
+python -m pip install ipython plotly
 python main.py
 python notebooks/_notebook_smoke.py
 ```
 
 ## Notes
 - The repository currently has no `tests/` directory, so `pytest` is not part of the current validation story.
+- `python notebooks/_notebook_smoke.py` depends on notebook-only packages (`IPython`, `plotly`) in addition to the core package install.
 - Recent refactors flattened `dataio/clusters.py` into `dataio.py` and `metrics/correlation.py` into `core_math.py`.
 - Project documentation was updated to reflect the current structure and entry points.
 

@@ -135,12 +135,14 @@ class SunSAL:
         y = measurements.T
 
         if x0 is None:
-            x = torch.full(
+            # Create a tensor of 1.0s natively in the correct precision
+            x = torch.ones(
                 (n_endmembers, n_pixels),
-                1.0 / n_endmembers,
                 device=device,
                 dtype=dtype,
             )
+            # Let PyTorch's backend handle the division safely
+            x = x / n_endmembers
         else:
             x0_2d = ensure_2d(x0)
             if x0_2d.shape != (n_pixels, n_endmembers):
@@ -155,13 +157,30 @@ class SunSAL:
         # Precompute B factorization and C vector, as defined in Fig. 2 of the paper
         at = endmembers
         b = at @ endmembers.T + cfg.μ * torch.eye(n_endmembers, device=device, dtype=dtype)
-
+        '''
         chol: torch.Tensor | None
         try:
             chol = torch.linalg.cholesky(b)
         except Exception:
             chol = None
+        '''
+        try:
+            # Try to pre-compute the Cholesky factorization for fast O(N^2) solves
+            # torch.linalg.cholesky returns a lower-triangular matrix
+            chol = torch.linalg.cholesky(b)
+            
+            def solve_b(rhs: torch.Tensor) -> torch.Tensor:
+                # torch.cholesky_solve is the correct function! 
+                # upper=False (the default) tells it to expect the lower-triangular matrix
+                return torch.cholesky_solve(rhs, chol, upper=False)
+                
+        except RuntimeError:
+            # Fallback to standard O(N^3) solver if 'b' is not positive-definite
+            def solve_b(rhs: torch.Tensor) -> torch.Tensor:
+                return torch.linalg.solve(b, rhs)
 
+
+        '''
         def solve_b(rhs: torch.Tensor) -> torch.Tensor:
             """Solve linear system against the ADMM matrix.
 
@@ -179,6 +198,7 @@ class SunSAL:
             if chol is not None:
                 return torch.cholesky_solve(rhs, chol)
             return torch.linalg.solve(b, rhs)
+        '''
 
         ones = torch.ones((n_endmembers, 1), device=device, dtype=dtype)
         b_inv_ones = solve_b(ones)
