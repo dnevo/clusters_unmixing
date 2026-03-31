@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from asyncio import run
 import random
 from typing import Any
 
@@ -36,30 +37,42 @@ def _build_stage_projections(
     raw_endmembers: np.ndarray,
     raw_pixels: np.ndarray,
 ) -> list[tuple[str, np.ndarray, np.ndarray]]:
-    wavelengths_sel, selected_endmembers = select_wavelength_ranges(
-        wavelengths,
-        raw_endmembers,
-        run["bands_ranges"],
+
+    wavelengths_sel, endmembers_sel = select_wavelength_ranges(
+        wavelengths=wavelengths,
+        spectra=raw_endmembers,
+        band_ranges=run["bands_ranges"],
     )
-    _, selected_pixels = select_wavelength_ranges(
-        wavelengths,
-        raw_pixels,
-        run["bands_ranges"],
+    wavelengths_sel, pixels_sel = select_wavelength_ranges(
+        wavelengths=wavelengths,
+        spectra=raw_pixels,
+        band_ranges=run["bands_ranges"],
     )
     projections: list[tuple[str, np.ndarray, np.ndarray]] = [
-        ("raw", selected_endmembers, selected_pixels)
+        ("raw", endmembers_sel, pixels_sel)
     ]
 
-    projected_endmembers, projected_pixels = apply_normalization(
-        selected_endmembers,
-        selected_pixels,
-        wavelengths_sel,
-        run["normalization"],
+    projected_endmembers = apply_normalization(
+        spectra=endmembers_sel, 
+        wavelengths=wavelengths_sel, 
+        normalization=run["normalization"]
     )
+    
+    projected_pixels = apply_normalization(
+        spectra=pixels_sel, 
+        wavelengths=wavelengths_sel, 
+        normalization=run["normalization"]
+    )
+
     projections.append(("normalized", projected_endmembers, projected_pixels))
 
     for name, params in run["transform_steps"]:
-        projected_endmembers, projected_pixels = apply_transform(projected_endmembers, projected_pixels, name, params)
+        projected_endmembers, projected_pixels = apply_transform(
+            endmembers=projected_endmembers, 
+            pixels=projected_pixels, 
+            kind=name, 
+            params=params
+        )
         projections.append((name, projected_endmembers, projected_pixels))
 
     return projections
@@ -74,7 +87,6 @@ def _make_synthetic_pixels(
     endmembers: np.ndarray,
     num_pixels: int,
     snr_db: float,
-    seed: int | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     n_endmembers = endmembers.shape[0]
     abundances = generate_samples(
@@ -83,7 +95,7 @@ def _make_synthetic_pixels(
         num_endmembers=n_endmembers,
     )
     clean_pixels = abundances @ endmembers
-    noisy_pixels, _ = apply_snr_noise(clean_pixels, snr_db, seed=seed)
+    noisy_pixels, _ = apply_snr_noise(clean_pixels, snr_db)
     return noisy_pixels, abundances
 
 
@@ -123,7 +135,6 @@ def run_experiments(exp: ExperimentConfig) -> dict[str, Any]:
             raw_endmembers,
             run["num_pixels"],
             run["snr_db"],
-            seed=0,
         )
 
         stage_projections = _build_stage_projections(
@@ -159,7 +170,6 @@ def run_experiments(exp: ExperimentConfig) -> dict[str, Any]:
         )
 
         for model_spec in run['models']:
-            _set_global_seeds(0)
             abundances, _ = run_registered_model(
                 model_name=model_spec['name'],
                 endmembers=projected_endmembers,

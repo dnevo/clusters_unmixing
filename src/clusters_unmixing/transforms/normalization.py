@@ -3,17 +3,17 @@ from __future__ import annotations
 import numpy as np
 
 
-def quadratic_normalize(endmembers: np.ndarray, wavelengths: np.ndarray) -> np.ndarray:
+def quadratic_normalize(spectra: np.ndarray, wavelengths: np.ndarray) -> np.ndarray:
     """Subtract the fixed quadratic baseline used by the project notebook/pipeline."""
-    endmembers_arr = np.asarray(endmembers, dtype=float)
+    spectra_arr = np.asarray(spectra, dtype=float)
     wavelengths_arr = np.asarray(wavelengths, dtype=float)
     q_values = -0.20 * wavelengths_arr**2 + 0.68 * wavelengths_arr - 0.12
-    return endmembers_arr - q_values[None, :]
+    return spectra_arr - q_values[None, :]
 
 
-def apply_normalization(endmembers: np.ndarray, pixels: np.ndarray, wavelengths: np.ndarray, normalization: str) -> tuple[np.ndarray, np.ndarray]:
+def apply_normalization(spectra: np.ndarray, wavelengths: np.ndarray, normalization: str) -> np.ndarray:
     if normalization == 'without':
-        return endmembers, pixels
+        return spectra
     if normalization == 'with_quadratic':
-        return quadratic_normalize(endmembers=endmembers, wavelengths=wavelengths), quadratic_normalize(endmembers=pixels, wavelengths=wavelengths)
+        return quadratic_normalize(spectra, wavelengths)
     raise ValueError(f'Unsupported normalization mode: {normalization}')

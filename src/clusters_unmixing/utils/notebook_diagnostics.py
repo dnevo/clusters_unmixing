@@ -127,7 +127,7 @@ def plot_pixel_preview(
     reference_row = pixel_rows[pixel_rows['source'] == 'true'].iloc[0]
     a_true = abundance_vector(reference_row)
     y_clean = np.asarray(a_true @ endmembers_full, dtype=float)
-    y_noisy, _ = apply_snr_noise(y_clean, float(snr_db), seed=int(pixel_index))
+    y_noisy, _ = apply_snr_noise(y_clean, float(snr_db))
 
     fig = go.Figure()
     fig.add_scatter(x=wavelength_axis_full, y=y_clean, mode='lines', name='without_noise')
@@ -217,7 +217,12 @@ def run_experiments_notebook(project_root: Path) -> None:
             y_title='Reflectance',
         ))
 
-        normalized_endmembers_full, _ = apply_normalization(endmembers_full, endmembers_full, wavelength_axis_full, normalization)
+        normalized_endmembers_full = apply_normalization(
+            endmembers_full, 
+            wavelength_axis_full, 
+            normalization
+        )
+
         if normalization != 'without':
             display(plot_cluster_overview(
                 wavelength_axis=wavelength_axis_full,

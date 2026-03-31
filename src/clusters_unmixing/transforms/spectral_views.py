@@ -54,13 +54,13 @@ def apply_transform(endmembers: np.ndarray, pixels: np.ndarray, kind: str, param
         return pca_reduce(endmembers, pixels, n_components=int(params["n_components"]))
     raise ValueError(f"Unsupported transform kind: {kind}")
 
-def select_wavelength_ranges(wavelengths: np.ndarray, endmembers: np.ndarray, bands_ranges: list[BandRangeSpec]) -> tuple[np.ndarray, np.ndarray]:
+def select_wavelength_ranges(wavelengths: np.ndarray, spectra: np.ndarray, band_ranges: list[BandRangeSpec]) -> tuple[np.ndarray, np.ndarray]:
     pieces_w = []
     pieces_s = []
-    for x_min, x_max, reduce in bands_ranges:
+    for x_min, x_max, reduce in band_ranges:
         mask = (wavelengths >= x_min) & (wavelengths <= x_max)
         w = wavelengths[mask]
-        s = endmembers[:, mask]
+        s = spectra[:, mask]
         if w.size == 0:
             raise ValueError(f"No wavelengths found in range [{x_min}, {x_max}]")
         if reduce == "mean":

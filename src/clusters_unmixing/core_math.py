@@ -10,7 +10,6 @@ def rmse(values: np.ndarray, reference: np.ndarray) -> float:
 def apply_snr_noise(
     clean_pixels: np.ndarray,
     snr_db: float,
-    seed: int | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Centralized SNR application logic for both pipelines and diagnostics."""
     if np.isinf(snr_db):
