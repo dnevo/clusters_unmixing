@@ -214,7 +214,14 @@ class ModelRunConfig(BaseModel):
 class ModelEvaluationConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     models: list[ModelSpecConfig] = Field(default_factory=list)
-    runs: list[ModelRunConfig] = Field(default_factory=list)
+    runs: list[ModelRunConfig] = Field(default_factory=list, validate_default=True)
+
+    @field_validator("runs")
+    @classmethod
+    def _validate_runs(cls, value: list[ModelRunConfig]) -> list[ModelRunConfig]:
+        if not value:
+            raise ValueError("model_evaluation.runs must contain at least one run")
+        return value
 
 
 class ExperimentConfig(BaseModel):
