@@ -31,14 +31,15 @@ def generate_samples(num_samples: int, max_non_zero_endmembers: int, num_endmemb
         if k == 1:
             fractions = [1.0]
         else:
-            split_points = sorted(random.sample(range(1, 10), k - 1))
+            num_fractions = 50
+            split_points = sorted(random.sample(range(1, num_fractions), k - 1))
             parts: list[int] = []
             prev_point = 0
             for point in split_points:
                 parts.append(point - prev_point)
                 prev_point = point
-            parts.append(10 - prev_point)
-            fractions = [p / 10.0 for p in parts]
+            parts.append(num_fractions - prev_point)
+            fractions = [p / float(num_fractions) for p in parts]
 
         sample = np.zeros(num_endmembers, dtype=np.float32)
         for idx, val in zip(non_zero_indices, fractions):

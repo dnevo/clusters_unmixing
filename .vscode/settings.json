@@ -1,0 +1,7 @@
+{
+    "python.defaultInterpreterPath": "H:\\envs\\research_base\\Scripts\\python.exe",
+    "python.terminal.activateEnvironment": true,
+    "python.analysis.extraPaths": [
+        "${workspaceFolder}/src"
+    ]
+}
