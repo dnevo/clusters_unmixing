@@ -235,7 +235,7 @@ def run_experiments_notebook(project_root: Path) -> None:
         display(correlation_df.loc[run_index])
 
         display(Markdown('### Model metrics'))
-        display(model_df.loc[run_index])
+        display(model_df.loc[run_index][run_cfg.normalized_models()])
 
         abundance_rows = abundance_df.loc[[run_index]]
         display(Markdown('### Abundances'))

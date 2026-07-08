@@ -38,7 +38,7 @@ model_evaluation:
       params:
         hidden_dim_1: 64
         hidden_dim_2: 32
-        epochs: 400
+        epochs: 20
         batch_size: 128
         learning_rate: 0.001
         weight_decay: 0.00001
@@ -47,6 +47,17 @@ model_evaluation:
         patience: 20
         verbose: true         # options: true | false
 
+    - name: convnext1d
+      params:
+        epochs: 20
+        batch_size: 32
+        learning_rate: 0.001
+        weight_decay: 0.0001
+        dropout: 0.15
+        lambda_recon: 0.1
+        clip_grad_norm: 1.0
+        patience: 20
+        verbose: true         # options: true | false
   runs:
     # run 1/2
     - cluster_set: 6clusters_thomas
@@ -118,3 +129,6 @@ model_evaluation:
 
       models:
         - sunsal
+        - vpgdu
+        - small_mlp
+        - convnext1d
