@@ -54,6 +54,11 @@ class _ConvNeXt1DBlock(nn.Module):
         self.pointwise_2 = nn.Conv1d(hidden_channels, channels, kernel_size=1)
         self.dropout = nn.Dropout(dropout)
 
+        # Zero-init the residual branch's last layer so each block starts as an
+        # identity map, matching the ConvNeXt/ResNet trick for stabler early training.
+        nn.init.zeros_(self.pointwise_2.weight)
+        nn.init.zeros_(self.pointwise_2.bias)
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         residual = x
         x = self.depthwise_conv(x)
