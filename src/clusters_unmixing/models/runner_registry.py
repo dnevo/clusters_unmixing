@@ -89,5 +89,13 @@ def run_registered_model(
     true_abundances_t = torch.tensor(true_abundances, dtype=torch.float32, device=device)
     predicted_abundances_t, diagnostics_dict = _MODEL_REGISTRY[model_name](endmembers_t, pixels_t, true_abundances_t, params)
     predicted_abundances = predicted_abundances_t.detach().cpu().numpy()
- 
+
+    # Models run back-to-back in the same process (both experiment runs, every
+    # configured model). Without this, PyTorch's CUDA caching allocator keeps
+    # reserving memory freed by earlier models instead of returning it, so later
+    # models see less headroom than nvidia-smi/task memory would suggest.
+    del endmembers_t, pixels_t, true_abundances_t, predicted_abundances_t
+    if device.type == "cuda":
+        torch.cuda.empty_cache()
+
     return predicted_abundances, diagnostics_dict

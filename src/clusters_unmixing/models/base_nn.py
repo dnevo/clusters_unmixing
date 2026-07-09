@@ -223,7 +223,16 @@ class BaseNNUnmixing(ABC):
             endmembers_k_bands=endmembers_k_bands,
         )
 
+        # Chunked rather than a single model(pixels_n_bands) call: with many samples
+        # and no transform (raw high-band-count spectra), a one-shot forward over the
+        # full dataset can allocate a multi-GB intermediate tensor and OOM the GPU.
         with torch.no_grad():
-            abundances_all = model(pixels_n_bands)
+            abundances_all = torch.cat(
+                [
+                    model(pixels_n_bands[start : start + batch_size])
+                    for start in range(0, n_samples, batch_size)
+                ],
+                dim=0,
+            )
 
         return abundances_all
