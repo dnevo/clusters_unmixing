@@ -100,6 +100,7 @@ class BaseNNUnmixing(ABC):
         endmembers: torch.Tensor,
         pixels: torch.Tensor,
         true_abundances: torch.Tensor,
+        test_indices: torch.Tensor | None = None,
     ) -> torch.Tensor:
         cfg = self.cfg
 
@@ -123,20 +124,36 @@ class BaseNNUnmixing(ABC):
                 f"n_endmembers={n_endmembers}"
             )
 
-        train_count, val_count, test_count = self._split_counts(n_samples)
+        if test_indices is not None:
+            # Test set is fixed by the caller so every model in the experiment is
+            # scored on the exact same held-out pixels; only train/val (which this
+            # model never gets scored on) are split randomly from what remains.
+            test_idx = test_indices.to(device=device, dtype=torch.long)
+            test_mask = torch.zeros(n_samples, dtype=torch.bool, device=device)
+            test_mask[test_idx] = True
+            remaining_idx = torch.nonzero(~test_mask, as_tuple=True)[0]
+            remaining_idx = remaining_idx[torch.randperm(remaining_idx.numel(), device=device)]
 
-        # 1. Generate a random permutation of all indices
-        split_indices = torch.randperm(n_samples, device=device)
+            train_count = min(int(n_samples * 0.70), remaining_idx.numel())
+            val_count = min(int(n_samples * 0.20), remaining_idx.numel() - train_count)
 
-        # 2. Use the shuffled indices to create the splits
-        x_train = pixels_n_bands[split_indices[:train_count]]
-        y_train = true_abundances_n_k[split_indices[:train_count]]
+            train_idx = remaining_idx[:train_count]
+            val_idx = remaining_idx[train_count : train_count + val_count]
+        else:
+            train_count, val_count, _ = self._split_counts(n_samples)
+            split_indices = torch.randperm(n_samples, device=device)
+            train_idx = split_indices[:train_count]
+            val_idx = split_indices[train_count : train_count + val_count]
+            test_idx = split_indices[train_count + val_count :]
 
-        x_val = pixels_n_bands[split_indices[train_count : train_count + val_count]]
-        y_val = true_abundances_n_k[split_indices[train_count : train_count + val_count]]
+        x_train = pixels_n_bands[train_idx]
+        y_train = true_abundances_n_k[train_idx]
 
-        x_test = pixels_n_bands[split_indices[train_count + val_count :]]
-        y_test = true_abundances_n_k[split_indices[train_count + val_count :]]
+        x_val = pixels_n_bands[val_idx]
+        y_val = true_abundances_n_k[val_idx]
+
+        x_test = pixels_n_bands[test_idx]
+        y_test = true_abundances_n_k[test_idx]
 
         model = self.model.to(device=device, dtype=dtype)
 

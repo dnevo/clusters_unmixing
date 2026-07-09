@@ -83,6 +83,19 @@ def _set_global_seeds(seed: int) -> None:
     torch.manual_seed(seed)
 
 
+def _make_held_out_test_indices(n_pixels: int, test_fraction: float = 0.1) -> np.ndarray:
+    """Pick one held-out pixel subset per run, shared by every model.
+
+    Iterative solvers (sunsal/vpgdu) never see labels, so scoring them on all
+    pixels is fine; but small_mlp/convnext1d train on ~90% of the same pixels,
+    so scoring everyone on all pixels would let those two "cheat" on the
+    reported metric. Using the same held-out subset for every model keeps the
+    comparison apples-to-apples.
+    """
+    test_count = int(n_pixels * test_fraction)
+    return np.random.permutation(n_pixels)[:test_count]
+
+
 def _make_synthetic_pixels(
     endmembers: np.ndarray,
     num_pixels: int,
@@ -144,6 +157,7 @@ def run_experiments(exp: ExperimentConfig) -> dict[str, Any]:
             raw_pixels,
         )
         _, projected_endmembers, projected_pixels = stage_projections[-1]
+        test_indices = _make_held_out_test_indices(projected_pixels.shape[0])
         for metric_name in exp.metrics:
             for stage_name, stage_endmembers, _ in stage_projections:
                 matrix = compute_correlation_matrix(stage_endmembers, metric_name)
@@ -176,11 +190,20 @@ def run_experiments(exp: ExperimentConfig) -> dict[str, Any]:
                 pixels=projected_pixels,
                 true_abundances=true_abundances,
                 params=model_spec['params'],
+                test_indices=test_indices,
             )
-            reconstructed_pixels = abundances @ projected_endmembers
+            # Score every model on the same held-out pixels (see
+            # _make_held_out_test_indices) rather than the full pixel set, so
+            # models that trained on some of these pixels (small_mlp,
+            # convnext1d) aren't compared unfairly against ones that didn't
+            # (sunsal, vpgdu).
+            test_abundances_pred = abundances[test_indices]
+            test_true_abundances = true_abundances[test_indices]
+            test_projected_pixels = projected_pixels[test_indices]
+            reconstructed_pixels = test_abundances_pred @ projected_endmembers
             for metric_name, value in [
-                ('abundance_rmse', rmse(abundances, true_abundances)),
-                ('reconstruction_rmse', rmse(reconstructed_pixels, projected_pixels)),
+                ('abundance_rmse', rmse(test_abundances_pred, test_true_abundances)),
+                ('reconstruction_rmse', rmse(reconstructed_pixels, test_projected_pixels)),
             ]:
                 model_summary_rows.append({
                     'run_index': idx,
