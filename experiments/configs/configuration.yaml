@@ -102,7 +102,7 @@ model_evaluation:
       #       params:
       #         n_components: 5
 
-      num_pixels: 1024 # number of synthetic pixels generated
+      num_pixels: 10000 # number of synthetic pixels generated
 
       # signal-to-noise ratio
       snr_db: 20.0 # number (e.g 30.0) or inf (for no noise)
@@ -125,10 +125,10 @@ model_evaluation:
       transform:
         steps: []   # no transform
 
-      num_pixels: 256 # number of synthetic pixels generated
+      num_pixels: 10000 # number of synthetic pixels generated
 
       # signal-to-noise ratio
-      snr_db: 30.0 # number (e.g 30.0) or inf (for no noise)
+      snr_db: 20.0 # number (e.g 30.0) or inf (for no noise)
 
       models:
         - sunsal
