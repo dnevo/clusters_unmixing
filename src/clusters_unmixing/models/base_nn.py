@@ -71,11 +71,14 @@ class BaseNNUnmixing(ABC):
         true_abundances: torch.Tensor,
         endmembers_k_bands: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-        pred_abundances = self.model(pixels)
-        abund_loss = F.mse_loss(pred_abundances, true_abundances)
-        recon_pixels = pred_abundances @ endmembers_k_bands
-        recon_loss = F.mse_loss(recon_pixels, pixels)
-        total_loss = abund_loss + self.cfg.lambda_recon * recon_loss
+        # Mixed precision only on CUDA (T4 tensor cores) - halves activation memory
+        # and speeds up the conv/linear layers; CPU runs are unaffected.
+        with torch.autocast(device_type="cuda", enabled=getattr(self, "_use_amp", False)):
+            pred_abundances = self.model(pixels)
+            abund_loss = F.mse_loss(pred_abundances, true_abundances)
+            recon_pixels = pred_abundances @ endmembers_k_bands
+            recon_loss = F.mse_loss(recon_pixels, pixels)
+            total_loss = abund_loss + self.cfg.lambda_recon * recon_loss
         return total_loss, abund_loss, recon_loss, pred_abundances
 
     @torch.no_grad()
@@ -102,6 +105,8 @@ class BaseNNUnmixing(ABC):
 
         device = pixels.device
         dtype = pixels.dtype
+        self._use_amp = device.type == "cuda"
+        scaler = torch.cuda.amp.GradScaler(enabled=self._use_amp)
 
         endmembers_k_bands = endmembers.to(device=device, dtype=dtype).contiguous()
         pixels_n_bands = pixels.to(device=device, dtype=dtype).contiguous()
@@ -166,10 +171,12 @@ class BaseNNUnmixing(ABC):
                     true_abundances=batch_abundances,
                     endmembers_k_bands=endmembers_k_bands,
                 )
-                total_loss.backward()
+                scaler.scale(total_loss).backward()
                 if cfg.clip_grad_norm > 0:
+                    scaler.unscale_(optimizer)
                     torch.nn.utils.clip_grad_norm_(model.parameters(), cfg.clip_grad_norm)
-                optimizer.step()
+                scaler.step(optimizer)
+                scaler.update()
 
                 train_loss_sum += float(total_loss.item())
                 train_abund_sum += float(abund_loss.item())
@@ -226,7 +233,7 @@ class BaseNNUnmixing(ABC):
         # Chunked rather than a single model(pixels_n_bands) call: with many samples
         # and no transform (raw high-band-count spectra), a one-shot forward over the
         # full dataset can allocate a multi-GB intermediate tensor and OOM the GPU.
-        with torch.no_grad():
+        with torch.no_grad(), torch.autocast(device_type="cuda", enabled=self._use_amp):
             abundances_all = torch.cat(
                 [
                     model(pixels_n_bands[start : start + batch_size])
