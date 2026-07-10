@@ -82,6 +82,7 @@ model_evaluation:
         d_conv: 4
         expand: 2
         depth: 1
+        patch_size: 8
         epochs: 400
         batch_size: 128
         learning_rate: 0.001

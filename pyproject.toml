@@ -16,6 +16,11 @@ dependencies = [
   "torch",
 ]
 
+[project.optional-dependencies]
+# CUDA-only, requires a compiler toolchain to build - the mamba model works
+# without it (falls back to a pure-PyTorch scan), this just accelerates it.
+mamba = ["mamba-ssm"]
+
 [tool.setuptools]
 package-dir = {"" = "src"}
 

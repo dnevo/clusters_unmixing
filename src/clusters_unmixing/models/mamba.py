@@ -14,9 +14,17 @@ Minimal Mamba (selective state-space model) implementation based on:
 Gu, A., & Dao, T. (2023)
 Mamba: Linear-Time Sequence Modeling with Selective State Spaces.
 
-Uses a sequential (Python-loop) selective scan rather than a fused/parallel
-CUDA kernel, so it needs no custom kernels and runs on CPU or GPU alike.
+Defaults to a sequential (Python-loop) selective scan, which needs no custom
+kernels and runs on CPU or GPU alike. When the optional `mamba-ssm` package
+(CUDA-only, install with `pip install mamba-ssm`) is present and the input is
+on a CUDA device, the fused kernel is used instead - same math, much faster
+for long sequences since it avoids the per-timestep Python loop.
 """
+
+try:
+    from mamba_ssm.ops.selective_scan_interface import selective_scan_fn as _fused_selective_scan_fn
+except ImportError:
+    _fused_selective_scan_fn = None
 
 
 @dataclass(slots=True)
@@ -28,6 +36,7 @@ class MambaConfig(TrainingConfig):
     d_conv: int = 4
     expand: int = 2
     depth: int = 1
+    patch_size: int = 8
 
 
 class _MambaBlock(nn.Module):
@@ -79,6 +88,41 @@ class _MambaBlock(nn.Module):
         C: torch.Tensor,
     ) -> torch.Tensor:
         # u, delta: (batch, seq_len, d_inner); A: (d_inner, d_state); B, C: (batch, seq_len, d_state)
+        if _fused_selective_scan_fn is not None and u.is_cuda:
+            return _MambaBlock._selective_scan_fused(u, delta, A, B, C)
+        return _MambaBlock._selective_scan_naive(u, delta, A, B, C)
+
+    @staticmethod
+    def _selective_scan_fused(
+        u: torch.Tensor,
+        delta: torch.Tensor,
+        A: torch.Tensor,
+        B: torch.Tensor,
+        C: torch.Tensor,
+    ) -> torch.Tensor:
+        # mamba_ssm expects (batch, dim, seq_len) / (batch, dstate, seq_len), the
+        # transpose of our (batch, seq_len, dim) convention. delta is already
+        # softplus'd by the caller, so delta_softplus=False and D is applied by
+        # the caller too, so D=None here - both avoided being applied twice.
+        y = _fused_selective_scan_fn(
+            u.transpose(1, 2).contiguous(),
+            delta.transpose(1, 2).contiguous(),
+            A,
+            B.transpose(1, 2).contiguous(),
+            C.transpose(1, 2).contiguous(),
+            D=None,
+            delta_softplus=False,
+        )
+        return y.transpose(1, 2)
+
+    @staticmethod
+    def _selective_scan_naive(
+        u: torch.Tensor,
+        delta: torch.Tensor,
+        A: torch.Tensor,
+        B: torch.Tensor,
+        C: torch.Tensor,
+    ) -> torch.Tensor:
         batch, seq_len, d_inner = u.shape
         d_state = A.shape[1]
 
@@ -96,10 +140,12 @@ class _MambaBlock(nn.Module):
 class _AbundanceMamba(nn.Module):
     """Stack of Mamba blocks mapping a spectrum to softmax abundances.
 
-    Each band is treated as one sequence position (scalar reflectance value
-    embedded to ``d_model``), mirroring how ConvNeXt1D treats the spectrum as
-    a 1D sequence - but mixed across positions with a selective SSM instead
-    of convolutions.
+    Adjacent bands are grouped into patches of ``patch_size`` and embedded to
+    ``d_model`` (as ViT-style patch embedding does for images), rather than
+    treating every single band as its own sequence position - the selective
+    scan is a sequential Python loop over the sequence length, so patchifying
+    keeps that loop's iteration count (and runtime) from scaling directly
+    with the raw band count.
     """
 
     def __init__(
@@ -110,15 +156,17 @@ class _AbundanceMamba(nn.Module):
         d_conv: int,
         expand: int,
         depth: int,
+        patch_size: int,
     ) -> None:
         super().__init__()
-        self.stem = nn.Linear(1, d_model)
+        self.patch_size = patch_size
+        self.stem = nn.Conv1d(1, d_model, kernel_size=patch_size, stride=patch_size)
         self.blocks = nn.ModuleList([_MambaBlock(d_model, d_state, d_conv, expand) for _ in range(depth)])
         self.norms = nn.ModuleList([nn.LayerNorm(d_model) for _ in range(depth)])
         self.head = nn.Linear(d_model, out_dim)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.stem(x.unsqueeze(-1))  # (batch, bands, d_model)
+        x = self.stem(x.unsqueeze(1)).transpose(1, 2)  # (batch, bands // patch_size, d_model)
         for block, norm in zip(self.blocks, self.norms):
             x = x + block(norm(x))
         pooled = x.mean(dim=1)
@@ -139,4 +187,5 @@ class MambaUnmixing(BaseNNUnmixing):
             d_conv=self.cfg.d_conv,
             expand=self.cfg.expand,
             depth=self.cfg.depth,
+            patch_size=max(1, min(self.cfg.patch_size, in_dim)),
         )
