@@ -67,13 +67,18 @@ class _KANLinear(nn.Module):
 
     def _b_splines(self, x: torch.Tensor) -> torch.Tensor:
         # Cox-de Boor recursion. x: (batch, in_features) -> (batch, in_features, grid_size + spline_order)
-        grid = self.grid
-        x = x.unsqueeze(-1)
-        bases = ((x >= grid[:, :-1]) & (x < grid[:, 1:])).to(x.dtype)
-        for k in range(1, self.spline_order + 1):
-            left = (x - grid[:, : -(k + 1)]) / (grid[:, k:-1] - grid[:, : -(k + 1)])
-            right = (grid[:, k + 1 :] - x) / (grid[:, k + 1 :] - grid[:, 1:-k])
-            bases = left * bases[:, :, :-1] + right * bases[:, :, 1:]
+        # Forced fp32: this chains several divisions/subtractions of nearby grid
+        # values, which loses more precision under fp16 autocast than a plain
+        # matmul would - so it opts out of the outer autocast context.
+        with torch.autocast(device_type="cuda", enabled=False):
+            x = x.float()
+            grid = self.grid.float()
+            x = x.unsqueeze(-1)
+            bases = ((x >= grid[:, :-1]) & (x < grid[:, 1:])).to(x.dtype)
+            for k in range(1, self.spline_order + 1):
+                left = (x - grid[:, : -(k + 1)]) / (grid[:, k:-1] - grid[:, : -(k + 1)])
+                right = (grid[:, k + 1 :] - x) / (grid[:, k + 1 :] - grid[:, 1:-k])
+                bases = left * bases[:, :, :-1] + right * bases[:, :, 1:]
         return bases
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:

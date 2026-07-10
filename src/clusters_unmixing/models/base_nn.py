@@ -108,7 +108,7 @@ class BaseNNUnmixing(ABC):
         device = pixels.device
         dtype = pixels.dtype
         self._use_amp = device.type == "cuda"
-        scaler = torch.amp.GradScaler("cuda", enabled=self._use_amp)
+        scaler = torch.amp.GradScaler("cuda", enabled=self._use_amp)  # type: ignore[attr-defined]
 
         endmembers_k_bands = endmembers.to(device=device, dtype=dtype).contiguous()
         pixels_n_bands = pixels.to(device=device, dtype=dtype).contiguous()
@@ -158,7 +158,11 @@ class BaseNNUnmixing(ABC):
 
         model = self.model.to(device=device, dtype=dtype)
 
-        optimizer = torch.optim.Adam(
+        # AdamW (decoupled weight decay) rather than Adam: with plain Adam, weight
+        # decay is folded into the gradient before the adaptive step, which shrinks
+        # differently-scaled parameter groups (e.g. KAN's per-edge spline
+        # coefficients vs. a single base weight) inconsistently.
+        optimizer = torch.optim.AdamW(
             model.parameters(),
             lr=cfg.learning_rate,
             weight_decay=cfg.weight_decay,
