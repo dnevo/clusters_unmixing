@@ -107,10 +107,7 @@ model_evaluation:
 
       normalization: with_quadratic   # options: without | with_quadratic
       transform:
-        steps:   # no transform
-          - name: pca
-            params:
-              n_components: 5
+        steps: []   # no transform
       # without any transform:
       # transform:
       #   steps: []

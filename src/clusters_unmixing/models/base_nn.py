@@ -87,13 +87,37 @@ class BaseNNUnmixing(ABC):
         pixels: torch.Tensor,
         true_abundances: torch.Tensor,
         endmembers_k_bands: torch.Tensor,
+        batch_size: int | None = None,
     ) -> tuple[float, float, float]:
-        total_loss, abund_loss, recon_loss, _ = self._compute_losses(
-            pixels=pixels,
-            true_abundances=true_abundances,
-            endmembers_k_bands=endmembers_k_bands,
-        )
-        return float(total_loss.item()), float(abund_loss.item()), float(recon_loss.item())
+        n_samples = pixels.shape[0]
+        if batch_size is None or batch_size >= n_samples:
+            total_loss, abund_loss, recon_loss, _ = self._compute_losses(
+                pixels=pixels,
+                true_abundances=true_abundances,
+                endmembers_k_bands=endmembers_k_bands,
+            )
+            return float(total_loss.item()), float(abund_loss.item()), float(recon_loss.item())
+
+        # Chunked: some models' per-sample intermediates (e.g. Mamba's selective
+        # scan, which is 4D over batch/seq_len/d_inner/d_state) can OOM on a large
+        # val/test split even though training batches of the same size are fine.
+        # Each chunk's MSE is already a mean over a fixed per-sample element count,
+        # so weighting by chunk size reproduces the true overall mean exactly.
+        total_sum = abund_sum = recon_sum = 0.0
+        for start in range(0, n_samples, batch_size):
+            chunk_pixels = pixels[start : start + batch_size]
+            chunk_abundances = true_abundances[start : start + batch_size]
+            chunk_n = chunk_pixels.shape[0]
+            total_loss, abund_loss, recon_loss, _ = self._compute_losses(
+                pixels=chunk_pixels,
+                true_abundances=chunk_abundances,
+                endmembers_k_bands=endmembers_k_bands,
+            )
+            total_sum += float(total_loss.item()) * chunk_n
+            abund_sum += float(abund_loss.item()) * chunk_n
+            recon_sum += float(recon_loss.item()) * chunk_n
+
+        return total_sum / n_samples, abund_sum / n_samples, recon_sum / n_samples
 
     def solve(
         self,
@@ -217,6 +241,7 @@ class BaseNNUnmixing(ABC):
                 pixels=x_val,
                 true_abundances=y_val,
                 endmembers_k_bands=endmembers_k_bands,
+                batch_size=batch_size,
             )
 
             self.history["epoch"].append(epoch)
@@ -253,6 +278,7 @@ class BaseNNUnmixing(ABC):
             pixels=x_test,
             true_abundances=y_test,
             endmembers_k_bands=endmembers_k_bands,
+            batch_size=batch_size,
         )
 
         # Chunked rather than a single model(pixels_n_bands) call: with many samples
