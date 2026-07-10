@@ -101,13 +101,14 @@ class BaseNNUnmixing(ABC):
         pixels: torch.Tensor,
         true_abundances: torch.Tensor,
         test_indices: torch.Tensor | None = None,
+        run_label: str | None = None,
     ) -> torch.Tensor:
         cfg = self.cfg
 
         device = pixels.device
         dtype = pixels.dtype
         self._use_amp = device.type == "cuda"
-        scaler = torch.cuda.amp.GradScaler(enabled=self._use_amp)
+        scaler = torch.amp.GradScaler("cuda", enabled=self._use_amp)
 
         endmembers_k_bands = endmembers.to(device=device, dtype=dtype).contiguous()
         pixels_n_bands = pixels.to(device=device, dtype=dtype).contiguous()
@@ -167,6 +168,9 @@ class BaseNNUnmixing(ABC):
         best_state = None
         best_val_loss = float("inf")
         epochs_without_improvement = 0
+
+        if cfg.verbose and run_label:
+            print(f"--- {run_label} ---")
 
         for epoch in range(1, int(cfg.epochs) + 1):
             model.train()

@@ -191,6 +191,7 @@ def run_experiments(exp: ExperimentConfig) -> dict[str, Any]:
                 true_abundances=true_abundances,
                 params=model_spec['params'],
                 test_indices=test_indices,
+                run_label=f"Run {idx}/{len(runs)} | model={model_spec['name']}",
             )
             # Score every model on the same held-out pixels (see
             # _make_held_out_test_indices) rather than the full pixel set, so
