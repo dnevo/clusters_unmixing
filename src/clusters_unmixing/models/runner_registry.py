@@ -7,6 +7,7 @@ import torch
 
 from .small_mlp import SmallMLPConfig, SmallMLPUnmixing
 from .convnext1d import ConvNeXt1DConfig, ConvNeXt1DUnmixing
+from .kan import KANConfig, KANUnmixing
 from .sunsal import SunSAL, SunSALConfig
 from .vpgdu import VPGDU, VPGDUConfig
 
@@ -69,8 +70,27 @@ def _run_convnext1d(endmembers: torch.Tensor, pixels: torch.Tensor, true_abundan
     }
 
 
+def _run_kan(endmembers: torch.Tensor, pixels: torch.Tensor, true_abundances: torch.Tensor, params: dict[str, Any], test_indices: torch.Tensor | None, run_label: str | None) -> tuple[torch.Tensor, dict[str, Any]]:
+    solver = KANUnmixing(
+        KANConfig(**params),
+        in_dim=int(pixels.shape[1]),
+        out_dim=int(endmembers.shape[0]),
+    )
+    abundances = solver.solve(endmembers, pixels, true_abundances, test_indices=test_indices, run_label=run_label)
+    history = getattr(solver, "history", {}) or {}
+    epochs = history.get("epoch") or []
+    return abundances, {
+        "iterations_logged": int(epochs[-1] if epochs else 0),
+        "last_active_pixels": int(pixels.shape[0]),
+        "best_val_loss": float(solver.best_val_loss),
+        "test_loss": float(solver.test_loss),
+        "test_abund_loss": float(solver.test_abund_loss),
+        "test_recon_loss": float(solver.test_recon_loss),
+    }
+
+
 _MODEL_REGISTRY: dict[str, ModelRunner] = {
-    "sunsal": _run_sunsal, "vpgdu": _run_vpgdu, "small_mlp": _run_small_mlp, "convnext1d": _run_convnext1d}
+    "sunsal": _run_sunsal, "vpgdu": _run_vpgdu, "small_mlp": _run_small_mlp, "convnext1d": _run_convnext1d, "kan": _run_kan}
 
 
 def available_models() -> list[str]:

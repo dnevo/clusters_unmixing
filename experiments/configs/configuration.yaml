@@ -60,6 +60,20 @@ model_evaluation:
         kernel_size: 7
         patience: 20
         verbose: true         # options: true | false
+
+    - name: kan
+      params:
+        hidden_dim: 32
+        grid_size: 5
+        spline_order: 3
+        epochs: 400
+        batch_size: 128
+        learning_rate: 0.001
+        weight_decay: 0.00001
+        lambda_recon: 0.1
+        clip_grad_norm: 1.0
+        patience: 20
+        verbose: true         # options: true | false
   runs:
     # run 1/2
     - cluster_set: 6clusters_thomas
@@ -112,6 +126,7 @@ model_evaluation:
         - vpgdu
         - small_mlp
         - convnext1d
+        - kan
 
     # run 2/2
     - cluster_set: 6clusters_thomas
@@ -134,4 +149,3 @@ model_evaluation:
         - sunsal
         - vpgdu
         - small_mlp
-        - convnext1d
