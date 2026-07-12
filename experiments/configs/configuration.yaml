@@ -96,15 +96,15 @@ model_evaluation:
     - cluster_set: 6clusters_thomas
 
       bands_ranges:
-
-        - range_µm: [0.5, 0.8]
+        # Chosen by an empirical sweep (train small_mlp, compare real
+        # abundance_rmse) across band-selection candidates: a narrower
+        # cosine-correlation-optimized selection (1.8-2.0um only) actually
+        # performed worse (rmse=0.148) than using nearly the full spectrum
+        # (rmse=0.079) - noise-averaging from more bands matters more than
+        # endmember separability here. Only the near-zero-signal sensor edge
+        # (0.35-0.40um) is trimmed.
+        - range_µm: [0.4, 2.5]
           reduce: none          # options: none | mean
-
-        - range_µm: [1.2, 1.6]
-          reduce: mean
-
-        - range_µm: [2.0, 2.5]
-          reduce: none
 
       normalization: with_quadratic   # options: without | with_quadratic
       transform:
@@ -164,3 +164,4 @@ model_evaluation:
         - sunsal
         - vpgdu
         - small_mlp
+        - kan

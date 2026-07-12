@@ -5,7 +5,7 @@ import yaml
 from pathlib import Path
 from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
-from clusters_unmixing.models.runner_registry import available_models
+from clusters_unmixing.models.runner_registry import known_model_names
 
 BandRangeSpec = tuple[float, float, str]
 TransformStepSpec = tuple[str, dict[str, Any]]
@@ -59,7 +59,7 @@ class ModelSpecConfig(BaseModel):
     @model_validator(mode="after")
     def _validate_params(self) -> "ModelSpecConfig":
         name = self.normalized_name()
-        valid_models = available_models()
+        valid_models = known_model_names()
         if name not in valid_models:
             raise ValueError(f"Unsupported model '{self.name}'. Registered models: {sorted(valid_models)}")
         if name == "small_mlp":
@@ -130,8 +130,8 @@ class ModelRunConfig(BaseModel):
         if not value:
             raise ValueError("Model run 'models' must be non-empty")
         normalized = [item.strip().lower() for item in value if item.strip()]
-        
-        valid_models = available_models()
+
+        valid_models = known_model_names()
         invalid = [name for name in normalized if name not in valid_models]
         if invalid:
             raise ValueError(f"Unsupported model names in run: {sorted(set(invalid))}")

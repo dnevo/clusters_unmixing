@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
 import torch
@@ -14,17 +15,14 @@ Minimal Mamba (selective state-space model) implementation based on:
 Gu, A., & Dao, T. (2023)
 Mamba: Linear-Time Sequence Modeling with Selective State Spaces.
 
-Defaults to a sequential (Python-loop) selective scan, which needs no custom
-kernels and runs on CPU or GPU alike. When the optional `mamba-ssm` package
-(CUDA-only, install with `pip install mamba-ssm`) is present and the input is
-on a CUDA device, the fused kernel is used instead - same math, much faster
-for long sequences since it avoids the per-timestep Python loop.
+GPU-only: the selective scan and the causal conv use mamba-ssm's/causal-conv1d's
+fused CUDA kernels rather than pure-PyTorch equivalents, so both packages must
+be installed and inputs must be on a CUDA device (see the notebook's install
+cell).
 """
 
-try:
-    from mamba_ssm.ops.selective_scan_interface import selective_scan_fn as _fused_selective_scan_fn
-except ImportError:
-    _fused_selective_scan_fn = None
+from causal_conv1d import causal_conv1d_fn
+from mamba_ssm.ops.selective_scan_interface import selective_scan_fn
 
 
 @dataclass(slots=True)
@@ -49,7 +47,17 @@ class _MambaBlock(nn.Module):
         self.d_state = d_state
 
         self.in_proj = nn.Linear(d_model, 2 * d_inner)
-        self.conv1d = nn.Conv1d(d_inner, d_inner, kernel_size=d_conv, groups=d_inner, padding=d_conv - 1)
+
+        # Raw (dim, width) weight/bias rather than nn.Conv1d, since
+        # causal_conv1d_fn takes that shape directly (no singleton
+        # in_channels/groups dim). Initialized to match nn.Conv1d's own
+        # reset_parameters() for a depthwise conv of this shape.
+        self.conv1d_weight = nn.Parameter(torch.empty(d_inner, d_conv))
+        self.conv1d_bias = nn.Parameter(torch.empty(d_inner))
+        nn.init.kaiming_uniform_(self.conv1d_weight, a=math.sqrt(5))
+        bound = 1 / math.sqrt(d_conv)
+        nn.init.uniform_(self.conv1d_bias, -bound, bound)
+
         self.x_proj = nn.Linear(d_inner, dt_rank + 2 * d_state)
         self.dt_proj = nn.Linear(dt_rank, d_inner)
 
@@ -63,11 +71,11 @@ class _MambaBlock(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # x: (batch, seq_len, d_model)
-        seq_len = x.shape[1]
         x_in, z = self.in_proj(x).chunk(2, dim=-1)
 
-        x_conv = self.conv1d(x_in.transpose(1, 2))[:, :, :seq_len]
-        x_conv = F.silu(x_conv.transpose(1, 2))  # (batch, seq_len, d_inner)
+        x_conv = causal_conv1d_fn(
+            x_in.transpose(1, 2).contiguous(), self.conv1d_weight, self.conv1d_bias, activation="silu"
+        ).transpose(1, 2)  # (batch, seq_len, d_inner)
 
         dt_rank = self.dt_proj.in_features
         delta, B, C = torch.split(self.x_proj(x_conv), [dt_rank, self.d_state, self.d_state], dim=-1)
@@ -88,23 +96,11 @@ class _MambaBlock(nn.Module):
         C: torch.Tensor,
     ) -> torch.Tensor:
         # u, delta: (batch, seq_len, d_inner); A: (d_inner, d_state); B, C: (batch, seq_len, d_state)
-        if _fused_selective_scan_fn is not None and u.is_cuda:
-            return _MambaBlock._selective_scan_fused(u, delta, A, B, C)
-        return _MambaBlock._selective_scan_naive(u, delta, A, B, C)
-
-    @staticmethod
-    def _selective_scan_fused(
-        u: torch.Tensor,
-        delta: torch.Tensor,
-        A: torch.Tensor,
-        B: torch.Tensor,
-        C: torch.Tensor,
-    ) -> torch.Tensor:
         # mamba_ssm expects (batch, dim, seq_len) / (batch, dstate, seq_len), the
         # transpose of our (batch, seq_len, dim) convention. delta is already
         # softplus'd by the caller, so delta_softplus=False and D is applied by
         # the caller too, so D=None here - both avoided being applied twice.
-        y = _fused_selective_scan_fn(
+        y = selective_scan_fn(
             u.transpose(1, 2).contiguous(),
             delta.transpose(1, 2).contiguous(),
             A,
@@ -115,37 +111,15 @@ class _MambaBlock(nn.Module):
         )
         return y.transpose(1, 2)
 
-    @staticmethod
-    def _selective_scan_naive(
-        u: torch.Tensor,
-        delta: torch.Tensor,
-        A: torch.Tensor,
-        B: torch.Tensor,
-        C: torch.Tensor,
-    ) -> torch.Tensor:
-        batch, seq_len, d_inner = u.shape
-        d_state = A.shape[1]
-
-        delta_A = torch.exp(delta.unsqueeze(-1) * A)  # (batch, seq_len, d_inner, d_state)
-        delta_B_u = delta.unsqueeze(-1) * B.unsqueeze(2) * u.unsqueeze(-1)
-
-        h = torch.zeros(batch, d_inner, d_state, device=u.device, dtype=u.dtype)
-        outputs = []
-        for t in range(seq_len):
-            h = delta_A[:, t] * h + delta_B_u[:, t]
-            outputs.append(torch.einsum("bdn,bn->bd", h, C[:, t]))
-        return torch.stack(outputs, dim=1)  # (batch, seq_len, d_inner)
-
 
 class _AbundanceMamba(nn.Module):
     """Stack of Mamba blocks mapping a spectrum to softmax abundances.
 
     Adjacent bands are grouped into patches of ``patch_size`` and embedded to
     ``d_model`` (as ViT-style patch embedding does for images), rather than
-    treating every single band as its own sequence position - the selective
-    scan is a sequential Python loop over the sequence length, so patchifying
-    keeps that loop's iteration count (and runtime) from scaling directly
-    with the raw band count.
+    treating every single band as its own sequence position - this keeps the
+    sequence length (and so the conv/SSM compute and memory) from scaling
+    directly with the raw band count.
     """
 
     def __init__(

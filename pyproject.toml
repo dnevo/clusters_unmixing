@@ -17,8 +17,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# CUDA-only, requires a compiler toolchain to build - the mamba model works
-# without it (falls back to a pure-PyTorch scan), this just accelerates it.
+# CUDA-only, requires a compiler toolchain to build. Kept as an extra (not a
+# hard dependency of the package) since only the mamba model needs it - it's
+# required to use that model at all, which assumes a GPU runtime.
 mamba = ["mamba-ssm"]
 
 [tool.setuptools]
