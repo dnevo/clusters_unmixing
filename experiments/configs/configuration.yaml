@@ -139,8 +139,8 @@ model_evaluation:
         - sunsal
         - vpgdu
         - small_mlp
-        - convnext1d
-        - kan
+        #- convnext1d
+        #- kan
         - mamba
 
     # run 2/2
@@ -165,3 +165,4 @@ model_evaluation:
         - vpgdu
         - small_mlp
         - kan
+        - mamba

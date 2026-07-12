@@ -21,8 +21,8 @@ be installed and inputs must be on a CUDA device (see the notebook's install
 cell).
 """
 
-from causal_conv1d import causal_conv1d_fn
 from mamba_ssm.ops.selective_scan_interface import selective_scan_fn
+from causal_conv1d import causal_conv1d_fn
 
 
 @dataclass(slots=True)

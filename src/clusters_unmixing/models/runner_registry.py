@@ -95,9 +95,10 @@ _MODEL_REGISTRY: dict[str, ModelRunner] = {
 # Mamba requires the GPU-only mamba-ssm package (see pyproject.toml's "mamba"
 # extra); importing it is deferred and guarded so that its absence - the
 # common case for CPU-only environments - doesn't break every other model.
+print("** trying **")
 try:
     from .mamba import MambaConfig, MambaUnmixing
-
+    print("** was ok**")
     def _run_mamba(endmembers: torch.Tensor, pixels: torch.Tensor, true_abundances: torch.Tensor, params: dict[str, Any], test_indices: torch.Tensor | None, run_label: str | None) -> tuple[torch.Tensor, dict[str, Any]]:
         solver = MambaUnmixing(
             MambaConfig(**params),
@@ -118,6 +119,7 @@ try:
 
     _MODEL_REGISTRY["mamba"] = _run_mamba
 except ImportError:
+    print("** was not ok**")
     pass
 
 
