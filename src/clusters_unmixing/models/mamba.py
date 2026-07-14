@@ -71,21 +71,31 @@ class _MambaBlock(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # x: (batch, seq_len, d_model)
-        x_in, z = self.in_proj(x).chunk(2, dim=-1)
+        # Forced fp32 (autocast disabled): causal_conv1d_fn/selective_scan_fn are
+        # raw CUDA kernels that assert every tensor they receive shares one dtype.
+        # Under AMP, ops like torch.exp on an untouched fp32 parameter (A_log)
+        # don't get autocast-downcast the way linear/conv layers do, so u/delta
+        # (fp16 under autocast) and A (fp32) would otherwise mismatch and the
+        # kernel has no tolerance for that the way native PyTorch ops do.
+        with torch.autocast(device_type="cuda", enabled=False):
+            # disabling autocast only stops *further* downcasting - x may already
+            # be fp16 if it came from a layer upstream (e.g. LayerNorm) that ran
+            # under the still-active outer autocast, so cast explicitly too.
+            x_in, z = self.in_proj(x.float()).chunk(2, dim=-1)
 
-        x_conv = causal_conv1d_fn(
-            x_in.transpose(1, 2).contiguous(), self.conv1d_weight, self.conv1d_bias, activation="silu"
-        ).transpose(1, 2)  # (batch, seq_len, d_inner)
+            x_conv = causal_conv1d_fn(
+                x_in.transpose(1, 2).contiguous(), self.conv1d_weight, self.conv1d_bias, activation="silu"
+            ).transpose(1, 2)  # (batch, seq_len, d_inner)
 
-        dt_rank = self.dt_proj.in_features
-        delta, B, C = torch.split(self.x_proj(x_conv), [dt_rank, self.d_state, self.d_state], dim=-1)
-        delta = F.softplus(self.dt_proj(delta))  # (batch, seq_len, d_inner)
+            dt_rank = self.dt_proj.in_features
+            delta, B, C = torch.split(self.x_proj(x_conv), [dt_rank, self.d_state, self.d_state], dim=-1)
+            delta = F.softplus(self.dt_proj(delta))  # (batch, seq_len, d_inner)
 
-        A = -torch.exp(self.A_log)  # (d_inner, d_state)
-        y = self._selective_scan(x_conv, delta, A, B, C)
-        y = y + x_conv * self.D
-        y = y * F.silu(z)
-        return self.out_proj(y)
+            A = -torch.exp(self.A_log)  # (d_inner, d_state)
+            y = self._selective_scan(x_conv, delta, A, B, C)
+            y = y + x_conv * self.D
+            y = y * F.silu(z)
+            return self.out_proj(y)
 
     @staticmethod
     def _selective_scan(
