@@ -5,8 +5,8 @@ cluster_sets:
   - name: 6clusters_thomas
     path: data/6clusters_thomas.csv
 
-  - name: 6clusters_digitized
-    path: data/6clusters_digitized.csv
+  #- name: 6clusters_digitized
+  #  path: data/6clusters_digitized.csv
 
 # Metrics implemented in src/clusters_unmixing/core_math.py
 metrics:
@@ -32,6 +32,22 @@ model_evaluation:
         threshold: 1.0e-6
         max_iters: 500
         t: 10
+        verbose: false
+
+    - name: mlm
+      params:
+        # Multilinear Mixing Model (Heylen & Scheunders, 2016). p_min is
+        # negative (not just [0, 1)) because this project's own
+        # nonlinearity_gamma/GBM synthetic generator only ever increases
+        # reflectance relative to linear mixing, and MLM needs P<0 to fit
+        # that direction of deviation (see models/mlm.py docstring).
+        p_min: -5.0
+        p_max: 0.999
+        num_p_candidates: 201
+        refine_iters: 3
+        sunsal_mu: 0.05
+        sunsal_max_iters: 300
+        sunsal_tol: 1.0e-6
         verbose: false
 
     - name: small_mlp
@@ -135,13 +151,19 @@ model_evaluation:
       # signal-to-noise ratio
       snr_db: 20.0 # number (e.g 30.0) or inf (for no noise)
 
+      # Generalized Bilinear Model nonlinearity strength in [0, 1] applied when
+      # synthesizing pixels: 0.0 = standard linear mixing, 1.0 = Fan model
+      # (full pairwise multiple-scattering interaction between endmembers).
+      nonlinearity_gamma: 0.0
+
       models:
         - sunsal
         - vpgdu
+        - mlm
         - small_mlp
         #- convnext1d
-        #- kan
-        - mamba
+        - kan
+        #- mamba
 
     # run 2/2
     - cluster_set: 6clusters_thomas
@@ -160,9 +182,15 @@ model_evaluation:
       # signal-to-noise ratio
       snr_db: 20.0 # number (e.g 30.0) or inf (for no noise)
 
+      # Generalized Bilinear Model nonlinearity strength in [0, 1] applied when
+      # synthesizing pixels: 0.0 = standard linear mixing, 1.0 = Fan model
+      # (full pairwise multiple-scattering interaction between endmembers).
+      nonlinearity_gamma: 0.0
+
       models:
         - sunsal
         - vpgdu
+        - mlm
         - small_mlp
-        #- kan
+        - kan
         #- mamba

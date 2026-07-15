@@ -123,6 +123,15 @@ class ModelRunConfig(BaseModel):
     models: list[str]
     num_pixels: int
     snr_db: float
+    nonlinearity_gamma: float = Field(
+        0.0,
+        description=(
+            "Generalized Bilinear Model (GBM) nonlinearity strength in [0, 1] used when "
+            "synthesizing pixels from abundances and endmembers. 0.0 keeps the standard "
+            "linear mixing model; 1.0 is the Fan model (full pairwise multiple-scattering "
+            "interaction between endmembers)."
+        ),
+    )
 
     @field_validator("models")
     @classmethod
@@ -163,6 +172,19 @@ class ModelRunConfig(BaseModel):
             raise ValueError("Model run 'snr_db' cannot be NaN")
         if float(value) < 0.0 and not math.isinf(float(value)):
             raise ValueError("Model run 'snr_db' must be >= 0 or inf")
+        return float(value)
+
+    @field_validator("nonlinearity_gamma")
+    @classmethod
+    def _validate_nonlinearity_gamma(cls, value: float) -> float:
+        if isinstance(value, bool):
+            raise ValueError("Model run 'nonlinearity_gamma' must be numeric, not bool")
+        if not isinstance(value, (int, float)):
+            raise ValueError("Model run 'nonlinearity_gamma' must be numeric")
+        if math.isnan(float(value)):
+            raise ValueError("Model run 'nonlinearity_gamma' cannot be NaN")
+        if not (0.0 <= float(value) <= 1.0):
+            raise ValueError("Model run 'nonlinearity_gamma' must be within [0, 1]")
         return float(value)
 
     def normalized_models(self) -> list[str]:

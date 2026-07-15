@@ -8,6 +8,7 @@ import torch
 from .small_mlp import SmallMLPConfig, SmallMLPUnmixing
 from .convnext1d import ConvNeXt1DConfig, ConvNeXt1DUnmixing
 from .kan import KANConfig, KANUnmixing
+from .mlm import MLM, MLMConfig
 from .sunsal import SunSAL, SunSALConfig
 from .vpgdu import VPGDU, VPGDUConfig
 
@@ -31,6 +32,18 @@ def _run_vpgdu(endmembers: torch.Tensor, pixels: torch.Tensor, true_abundances: 
     active = history.get("active_pixels") or [pixels.shape[0]]
     iterations = history.get("iterations") or []
     return abundances, {"iterations_logged": int(len(iterations)), "last_active_pixels": int(active[-1])}
+
+
+def _run_mlm(endmembers: torch.Tensor, pixels: torch.Tensor, true_abundances: torch.Tensor, params: dict[str, Any], test_indices: torch.Tensor | None, run_label: str | None) -> tuple[torch.Tensor, dict[str, Any]]:
+    solver = MLM(MLMConfig(**dict(params)))
+    abundances = solver.solve(endmembers, pixels)
+    history = getattr(solver, "history", {}) or {}
+    return abundances, {
+        "iterations_logged": int(solver.cfg.refine_iters),
+        "last_active_pixels": int(pixels.shape[0]),
+        "p_mean": float((history.get("p_mean") or [0.0])[-1]),
+        "p_std": float((history.get("p_std") or [0.0])[-1]),
+    }
 
 
 def _run_small_mlp(endmembers: torch.Tensor, pixels: torch.Tensor, true_abundances: torch.Tensor, params: dict[str, Any], test_indices: torch.Tensor | None, run_label: str | None) -> tuple[torch.Tensor, dict[str, Any]]:
@@ -90,15 +103,13 @@ def _run_kan(endmembers: torch.Tensor, pixels: torch.Tensor, true_abundances: to
 
 
 _MODEL_REGISTRY: dict[str, ModelRunner] = {
-    "sunsal": _run_sunsal, "vpgdu": _run_vpgdu, "small_mlp": _run_small_mlp, "convnext1d": _run_convnext1d, "kan": _run_kan}
+    "sunsal": _run_sunsal, "vpgdu": _run_vpgdu, "mlm": _run_mlm, "small_mlp": _run_small_mlp, "convnext1d": _run_convnext1d, "kan": _run_kan}
 
 # Mamba requires the GPU-only mamba-ssm package (see pyproject.toml's "mamba"
 # extra); importing it is deferred and guarded so that its absence - the
 # common case for CPU-only environments - doesn't break every other model.
-print("** trying **")
 try:
     from .mamba import MambaConfig, MambaUnmixing
-    print("** was ok**")
     def _run_mamba(endmembers: torch.Tensor, pixels: torch.Tensor, true_abundances: torch.Tensor, params: dict[str, Any], test_indices: torch.Tensor | None, run_label: str | None) -> tuple[torch.Tensor, dict[str, Any]]:
         solver = MambaUnmixing(
             MambaConfig(**params),
@@ -119,7 +130,6 @@ try:
 
     _MODEL_REGISTRY["mamba"] = _run_mamba
 except ImportError:
-    print("** was not ok**")
     pass
 
 
@@ -134,7 +144,7 @@ def available_models() -> list[str]:
 # referencing "mamba" fails to even load on a machine without mamba-ssm,
 # instead of only failing when that specific model is actually invoked.
 KNOWN_MODEL_NAMES: frozenset[str] = frozenset(
-    {"sunsal", "vpgdu", "small_mlp", "convnext1d", "kan", "mamba"}
+    {"sunsal", "vpgdu", "mlm", "small_mlp", "convnext1d", "kan", "mamba"}
 )
 
 

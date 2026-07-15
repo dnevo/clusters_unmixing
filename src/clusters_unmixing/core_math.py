@@ -7,6 +7,37 @@ def rmse(values: np.ndarray, reference: np.ndarray) -> float:
     return float(np.sqrt(np.mean(np.square(np.asarray(values) - np.asarray(reference)))))
 
 
+def mix_pixels(abundances: np.ndarray, endmembers: np.ndarray, gamma: float = 0.0) -> np.ndarray:
+    """Combine abundances and endmembers into pixel spectra under the Generalized Bilinear Model.
+
+    ``gamma=0.0`` is the standard linear mixing model (``abundances @ endmembers``).
+    ``gamma=1.0`` is the Fan model: every pair of endmembers ``(i, j)`` contributes an
+    extra ``a_i * a_j * (m_i ⊙ m_j)`` term (elementwise product of the two endmember
+    spectra), approximating the multiple-scattering ("double bounce") interaction between
+    two distinct materials touching at sub-pixel scale. Values in between interpolate
+    linearly between the two regimes.
+
+    Parameters
+    ----------
+    abundances : (n_pixels, n_endmembers)
+    endmembers : (n_endmembers, n_bands)
+    gamma : nonlinearity strength in [0, 1].
+    """
+    linear = abundances @ endmembers
+    if gamma == 0.0:
+        return linear
+
+    n_endmembers = endmembers.shape[0]
+    nonlinear = np.zeros_like(linear)
+    for i in range(n_endmembers):
+        for j in range(i + 1, n_endmembers):
+            pair_spectrum = endmembers[i] * endmembers[j]
+            pair_weight = abundances[:, i] * abundances[:, j]
+            nonlinear += pair_weight[:, None] * pair_spectrum[None, :]
+
+    return linear + gamma * nonlinear
+
+
 def apply_snr_noise(
     clean_pixels: np.ndarray,
     snr_db: float,

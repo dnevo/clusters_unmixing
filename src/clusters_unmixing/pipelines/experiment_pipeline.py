@@ -9,7 +9,7 @@ import pandas as pd
 import torch
 
 from clusters_unmixing.config.schema import ExperimentConfig
-from clusters_unmixing.core_math import apply_snr_noise, compute_correlation_matrix, rmse, summarize_correlation_matrix
+from clusters_unmixing.core_math import apply_snr_noise, compute_correlation_matrix, mix_pixels, rmse, summarize_correlation_matrix
 from clusters_unmixing.data import generate_samples
 from clusters_unmixing.dataio import load_wavelength_and_cluster_matrix
 from clusters_unmixing.models.runner_registry import run_registered_model
@@ -27,6 +27,7 @@ def _planned_model_runs(exp: ExperimentConfig) -> list[dict[str, Any]]:
             "models": [{"name": name, "params": dict(model_params[name])} for name in item.normalized_models()],
             "num_pixels": item.num_pixels,
             "snr_db": item.snr_db,
+            "nonlinearity_gamma": item.nonlinearity_gamma,
         }
         for item in exp.model_evaluation.runs
     ]
@@ -100,14 +101,21 @@ def _make_synthetic_pixels(
     endmembers: np.ndarray,
     num_pixels: int,
     snr_db: float,
+    nonlinearity_gamma: float = 0.0,
 ) -> tuple[np.ndarray, np.ndarray]:
+    """Generate synthetic abundances and their resulting noisy pixel spectra.
+
+    Pixels are synthesized from abundances via the Generalized Bilinear Model
+    (see ``core_math.mix_pixels``); ``nonlinearity_gamma=0.0`` keeps the standard
+    linear mixing model. Additive noise is then applied at the requested SNR.
+    """
     n_endmembers = endmembers.shape[0]
     abundances = generate_samples(
         num_samples=num_pixels,
         max_non_zero_endmembers=n_endmembers,
         num_endmembers=n_endmembers,
     )
-    clean_pixels = abundances @ endmembers
+    clean_pixels = mix_pixels(abundances, endmembers, nonlinearity_gamma)
     noisy_pixels, _ = apply_snr_noise(clean_pixels, snr_db)
     return noisy_pixels, abundances
 
@@ -148,6 +156,7 @@ def run_experiments(exp: ExperimentConfig) -> dict[str, Any]:
             raw_endmembers,
             run["num_pixels"],
             run["snr_db"],
+            run["nonlinearity_gamma"],
         )
 
         stage_projections = _build_stage_projections(

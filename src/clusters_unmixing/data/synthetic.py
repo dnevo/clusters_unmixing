@@ -12,7 +12,7 @@ def generate_samples(num_samples: int, max_non_zero_endmembers: int, num_endmemb
     - include pure endmembers first
     - each sample has at most ``max_non_zero_endmembers`` active components
     - abundances sum to 1.0
-    - non-zero abundances are multiples of 0.1
+    - non-zero abundances are multiples of 0.02 (1/50)
 
     Randomness is intentionally driven by Python's ``random`` module so callers can
     reproduce the legacy results by resetting ``random.seed(...)`` before calling.

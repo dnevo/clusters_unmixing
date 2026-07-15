@@ -34,7 +34,7 @@ The default experiment configuration lives in `experiments/configs/configuration
 - `pipelines/experiment_pipeline.py`: experiment execution pipeline exposed as `run_experiments`
 - `utils/notebook_diagnostics.py`: notebook orchestration, tables, and plotting helpers
 - `models/runner_registry.py`: model registry and dispatch
-- `models/sunsal.py`, `models/vpgdu.py`, `models/small_mlp.py`: unmixing model implementations
+- `models/sunsal.py`, `models/vpgdu.py`, `models/mlm.py`, `models/small_mlp.py`, `models/convnext1d.py`, `models/kan.py`, `models/mamba.py`: unmixing model implementations
 
 ## Run the project
 

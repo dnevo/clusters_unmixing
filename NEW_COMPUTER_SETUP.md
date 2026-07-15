@@ -91,7 +91,7 @@ git status --short --ignored
 In this repo, the following are important:
 
 ```text
-data/6clusters_digitized.csv
+# data/6clusters_digitized.csv (deprecated, being removed)
 data/6clusters_thomas.csv
 experiments/configs/configuration.yaml
 ```
