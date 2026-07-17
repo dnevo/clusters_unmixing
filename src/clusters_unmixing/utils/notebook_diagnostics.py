@@ -161,10 +161,13 @@ def run_experiments_notebook(project_root: Path) -> None:
     abundance_preview_path = Path(result['model_evaluation']['abundance_preview_path'])
     correlation_summary_path = Path(result['correlation_summary_path'])
 
-    correlation_df = pd.read_csv(correlation_summary_path, index_col=['run_index', 'metric', 'stage'])
-    model_df = pd.read_csv(model_summary_path, index_col=['run_index', 'metric'])
-    model_df.columns.name = 'model'
-    abundance_df = pd.read_csv(abundance_preview_path, index_col='run_index')
+    # Not indexed by run_index here: a swept run expands into several resolved
+    # run_index values sharing one parent_run_index, so filtering by
+    # parent_run_index (below, per notebook section) is what actually maps back
+    # to a single configured run.
+    correlation_df = pd.read_csv(correlation_summary_path)
+    model_df = pd.read_csv(model_summary_path)
+    abundance_df = pd.read_csv(abundance_preview_path)
 
     display(Markdown(f"**Experiment name:** `{result['experiment_name']}`\n\n**Output dir:** `{result['output_dir']}`"))
 
@@ -181,6 +184,13 @@ def run_experiments_notebook(project_root: Path) -> None:
             f"{x_min:g}-{x_max:g} {reduce}"
             for x_min, x_max, reduce in bands_ranges
         )
+        parts = [f"{k}={v}" for k, v in run_cfg.sweep_params.items()]
+        parts += [
+            f"{entry.name}.{pkey}={pvalues}"
+            for entry in run_cfg.models
+            for pkey, pvalues in entry.param_sweep.items()
+        ]
+        sweep_label = '; '.join(parts) if parts else '-'
         config_view = pd.DataFrame(
             {
                 'value': [
@@ -189,7 +199,8 @@ def run_experiments_notebook(project_root: Path) -> None:
                     normalization,
                     run_cfg.num_pixels,
                     f'{snr_db:g} dB' if np.isfinite(snr_db) else 'inf',
-                    ', '.join(run_cfg.normalized_models()),
+                    ', '.join(run_cfg.effective_model_names()),
+                    sweep_label,
                 ]
             },
             index=[
@@ -199,6 +210,7 @@ def run_experiments_notebook(project_root: Path) -> None:
                 'pixels',
                 'snr',
                 'models',
+                'sweep',
             ],
         )
         display(config_view)
@@ -229,12 +241,16 @@ def run_experiments_notebook(project_root: Path) -> None:
                 bands_ranges=bands_ranges,
             ))
 
-        display(correlation_df.loc[run_index])
+        run_correlation = correlation_df[correlation_df['parent_run_index'] == run_index].drop(
+            columns=['parent_run_index']
+        ).set_index(['run_index', 'run_overrides', 'metric', 'stage'])
+        display(run_correlation)
 
         display(Markdown('### Model metrics'))
-        display(model_df.loc[run_index][run_cfg.normalized_models()])
+        run_model = model_df[model_df['parent_run_index'] == run_index].drop(columns=['parent_run_index'])
+        display(run_model.set_index(['run_index', 'run_overrides', 'metric']))
 
-        abundance_rows = abundance_df.loc[[run_index]]
+        abundance_rows = abundance_df[abundance_df['parent_run_index'] == run_index].drop(columns=['parent_run_index'])
         display(Markdown('### Abundances'))
         display(abundance_rows.reset_index(drop=True).style.hide(axis='index'))
 

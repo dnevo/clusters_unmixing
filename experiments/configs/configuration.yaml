@@ -124,7 +124,7 @@ model_evaluation:
 
       normalization: with_quadratic   # options: without | with_quadratic
 
-      num_pixels: 10000 # number of synthetic pixels generated
+      num_pixels: 1000 # number of synthetic pixels generated
 
       # signal-to-noise ratio
       snr_db: 20.0 # number (e.g 30.0) or inf (for no noise)
@@ -138,9 +138,9 @@ model_evaluation:
         - sunsal
         - vpgdu
         - mlm
-        - small_mlp
+        #- small_mlp
         #- convnext1d
-        - kan
+        #- kan
         #- mamba
 
     # run 2/2
@@ -153,7 +153,7 @@ model_evaluation:
 
       normalization: with_quadratic   # options: without | with_quadratic
 
-      num_pixels: 10000 # number of synthetic pixels generated
+      num_pixels: 1000 # number of synthetic pixels generated
 
       # signal-to-noise ratio
       snr_db: 20.0 # number (e.g 30.0) or inf (for no noise)
@@ -163,10 +163,26 @@ model_evaluation:
       # (full pairwise multiple-scattering interaction between endmembers).
       nonlinearity_gamma: 0.2
 
+      #models:
+        #- sunsal
+        #- vpgdu
+        #- mlm
+        #- small_mlp
+        #- kan
+        #- mamba
+
+      # Each 'models' entry is either a bare name (runs once with its unchanged
+      # defaults from model_evaluation.models above) or a single-key mapping
+      # 'name: {param: [values]}' sweeping that model over a param grid.
+      # 'sweep_params' (optional, sibling of 'models') is a cartesian product
+      # over run-level fields - only num_pixels, snr_db, nonlinearity_gamma,
+      # normalization are sweepable. Resolved executions = (sweep_params
+      # combinations) x (sum of each model entry's own param combinations).
       models:
         - sunsal
         - vpgdu
-        - mlm
-        - small_mlp
-        - kan
-        #- mamba
+        - kan:
+            batch_size: [32, 128]
+      sweep_params:
+        snr_db: [20.0, 30.0]
+        #nonlinearity_gamma: [0.0, 0.2, 0.4]

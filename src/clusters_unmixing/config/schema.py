@@ -12,6 +12,19 @@ BandRangeSpec = tuple[float, float, str]
 
 ALLOWED_CORRELATION_METRICS = {"cosine", "sam"}
 
+# Run-level fields eligible for sweep_params. Deliberately excludes cluster_set and
+# bands_ranges (both change array shapes downstream) and name/models/sweep_params
+# (structural, not data).
+SWEEPABLE_RUN_PARAMS = {"num_pixels", "snr_db", "nonlinearity_gamma", "normalization"}
+
+
+def _validate_sweep_value_list(owner: str, key: str, values: Any) -> list[Any]:
+    if not isinstance(values, list) or not values:
+        raise ValueError(f"{owner}.{key} must be a non-empty list")
+    if len(set(values)) != len(values):
+        raise ValueError(f"{owner}.{key} must not contain duplicate values")
+    return values
+
 
 class SmallMLPParamsModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -87,12 +100,66 @@ class BandRangeModel(BaseModel):
         return (float(self.range_um[0]), float(self.range_um[1]), str(self.reduce))
 
 
+class ModelSelectionEntry(BaseModel):
+    """One entry in a run's `models` list: either a bare model name (run once with
+    the model's catalog defaults from model_evaluation.models) or a single-key
+    mapping `name: {param: [values]}` sweeping that model over a param grid.
+
+    Cross-checking the name/params against the model_evaluation.models catalog
+    needs sibling data this model doesn't have, so that part happens in
+    ModelEvaluationConfig._validate_models_against_catalog instead.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+    name: str
+    param_sweep: dict[str, list[Any]] = Field(default_factory=dict)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _parse(cls, data: Any) -> Any:
+        if isinstance(data, str):
+            return {"name": data, "param_sweep": {}}
+        if isinstance(data, dict) and "name" not in data:
+            if len(data) != 1:
+                raise ValueError(
+                    "Model entry mapping must have exactly one key (the model name), "
+                    "e.g. 'kan: {batch_size: [32, 128]}'"
+                )
+            (raw_name, param_sweep), = data.items()
+            return {"name": raw_name, "param_sweep": param_sweep or {}}
+        return data
+
+    @field_validator("name")
+    @classmethod
+    def _validate_name(cls, value: str) -> str:
+        name = value.strip().lower()
+        if not name:
+            raise ValueError("Model entry requires a non-empty name")
+        valid_models = known_model_names()
+        if name not in valid_models:
+            raise ValueError(f"Unsupported model '{value}'. Registered models: {sorted(valid_models)}")
+        return name
+
+    @field_validator("param_sweep")
+    @classmethod
+    def _validate_param_sweep(cls, value: Any) -> dict[str, list[Any]]:
+        if not isinstance(value, dict):
+            raise ValueError("Model entry param overrides must be a mapping of parameter name -> list of values")
+        for key, values in value.items():
+            _validate_sweep_value_list("model entry", key, values)
+        return value
+
+    def is_swept(self) -> bool:
+        return bool(self.param_sweep)
+
+
 class ModelRunConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     cluster_set: str
     bands_ranges: list[Any]
     normalization: str = "without"
-    models: list[str]
+    models: list[ModelSelectionEntry]
+    sweep_params: dict[str, list[Any]] = Field(default_factory=dict)
     num_pixels: int
     snr_db: float
     nonlinearity_gamma: float = Field(
@@ -107,16 +174,22 @@ class ModelRunConfig(BaseModel):
 
     @field_validator("models")
     @classmethod
-    def _validate_models(cls, value: list[str]) -> list[str]:
+    def _validate_models(cls, value: list[ModelSelectionEntry]) -> list[ModelSelectionEntry]:
         if not value:
             raise ValueError("Model run 'models' must be non-empty")
-        normalized = [item.strip().lower() for item in value if item.strip()]
+        return value
 
-        valid_models = known_model_names()
-        invalid = [name for name in normalized if name not in valid_models]
-        if invalid:
-            raise ValueError(f"Unsupported model names in run: {sorted(set(invalid))}")
-        return normalized
+    @field_validator("sweep_params")
+    @classmethod
+    def _validate_sweep_params(cls, value: dict[str, list[Any]]) -> dict[str, list[Any]]:
+        unknown = sorted(set(value) - SWEEPABLE_RUN_PARAMS)
+        if unknown:
+            raise ValueError(
+                f"sweep_params has unsupported key(s) {unknown}; allowed: {sorted(SWEEPABLE_RUN_PARAMS)}"
+            )
+        for key, values in value.items():
+            _validate_sweep_value_list("sweep_params", key, values)
+        return value
 
     @field_validator("num_pixels")
     @classmethod
@@ -159,8 +232,10 @@ class ModelRunConfig(BaseModel):
             raise ValueError("Model run 'nonlinearity_gamma' must be within [0, 1]")
         return float(value)
 
-    def normalized_models(self) -> list[str]:
-        return [m.strip().lower() for m in self.models]
+    def effective_model_names(self) -> list[str]:
+        """Model names this run will execute (order as configured; may repeat if a
+        model appears in more than one `models` entry)."""
+        return [entry.name for entry in self.models]
 
     def normalized_bands_ranges(self) -> list[BandRangeSpec]:
         if not self.bands_ranges:
@@ -190,6 +265,26 @@ class ModelEvaluationConfig(BaseModel):
         if not value:
             raise ValueError("model_evaluation.runs must contain at least one run")
         return value
+
+    @model_validator(mode="after")
+    def _validate_models_against_catalog(self) -> "ModelEvaluationConfig":
+        catalog = {model.normalized_name(): model.params for model in self.models}
+        for run in self.runs:
+            for entry in run.models:
+                if entry.name not in catalog:
+                    raise ValueError(
+                        f"run references model '{entry.name}', which is not defined in "
+                        f"model_evaluation.models"
+                    )
+                if entry.param_sweep:
+                    default_params = catalog[entry.name]
+                    unknown = sorted(set(entry.param_sweep) - set(default_params))
+                    if unknown:
+                        raise ValueError(
+                            f"model '{entry.name}' has swept parameter(s) {unknown} not present in "
+                            f"its default params {sorted(default_params)}"
+                        )
+        return self
 
 
 class ExperimentConfig(BaseModel):

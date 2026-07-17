@@ -125,7 +125,6 @@ class BaseNNUnmixing(ABC):
         pixels: torch.Tensor,
         true_abundances: torch.Tensor,
         test_indices: torch.Tensor | None = None,
-        run_label: str | None = None,
     ) -> torch.Tensor:
         cfg = self.cfg
 
@@ -196,9 +195,6 @@ class BaseNNUnmixing(ABC):
         best_state = None
         best_val_loss = float("inf")
         epochs_without_improvement = 0
-
-        if cfg.verbose and run_label:
-            print(f"--- {run_label} ---")
 
         for epoch in range(1, int(cfg.epochs) + 1):
             model.train()

@@ -296,7 +296,15 @@ fairly (they never "trained" on any of it), unlike the supervised NN models.
   - `snr_db` — signal-to-noise ratio for additive Gaussian noise (`inf` for no noise).
   - `nonlinearity_gamma` — GBM nonlinearity strength in `[0, 1]` (default `0.0`, i.e.
     pure linear mixing).
-  - `models` — which registered model names to run for this configuration.
+  - `models` — which registered model names to run for this configuration. Each entry
+    is either a bare name (runs once using its unchanged defaults from
+    `model_evaluation.models`) or a single-key mapping `name: {param: [values]}`
+    sweeping that model over a param grid, e.g. `kan: {batch_size: [32, 128, 512]}`.
+  - `sweep_params` (optional) — a cartesian product over run-level fields; only
+    `num_pixels`, `snr_db`, `nonlinearity_gamma`, `normalization` are sweepable
+    (`cluster_set`/`bands_ranges` are excluded — they're structural, not scalar grid
+    axes). Resolved executions = (`sweep_params` combinations) x (sum of each
+    `models` entry's own param combinations).
 
 Relative paths (like `cluster_sets[*].path`) are resolved from the supplied project
 root.

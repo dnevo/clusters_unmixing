@@ -52,7 +52,7 @@ def _run_small_mlp(endmembers: torch.Tensor, pixels: torch.Tensor, true_abundanc
         in_dim=int(pixels.shape[1]),
         out_dim=int(endmembers.shape[0]),
     )
-    abundances = solver.solve(endmembers, pixels, true_abundances, test_indices=test_indices, run_label=run_label)
+    abundances = solver.solve(endmembers, pixels, true_abundances, test_indices=test_indices)
     history = getattr(solver, "history", {}) or {}
     epochs = history.get("epoch") or []
     return abundances, {
@@ -70,7 +70,7 @@ def _run_convnext1d(endmembers: torch.Tensor, pixels: torch.Tensor, true_abundan
         in_dim=int(pixels.shape[1]),
         out_dim=int(endmembers.shape[0]),
     )
-    abundances = solver.solve(endmembers, pixels, true_abundances, test_indices=test_indices, run_label=run_label)
+    abundances = solver.solve(endmembers, pixels, true_abundances, test_indices=test_indices)
     history = getattr(solver, "history", {}) or {}
     epochs = history.get("epoch") or []
     return abundances, {
@@ -89,7 +89,7 @@ def _run_kan(endmembers: torch.Tensor, pixels: torch.Tensor, true_abundances: to
         in_dim=int(pixels.shape[1]),
         out_dim=int(endmembers.shape[0]),
     )
-    abundances = solver.solve(endmembers, pixels, true_abundances, test_indices=test_indices, run_label=run_label)
+    abundances = solver.solve(endmembers, pixels, true_abundances, test_indices=test_indices)
     history = getattr(solver, "history", {}) or {}
     epochs = history.get("epoch") or []
     return abundances, {
@@ -116,7 +116,7 @@ try:
             in_dim=int(pixels.shape[1]),
             out_dim=int(endmembers.shape[0]),
         )
-        abundances = solver.solve(endmembers, pixels, true_abundances, test_indices=test_indices, run_label=run_label)
+        abundances = solver.solve(endmembers, pixels, true_abundances, test_indices=test_indices)
         history = getattr(solver, "history", {}) or {}
         epochs = history.get("epoch") or []
         return abundances, {
@@ -170,6 +170,8 @@ def run_registered_model(
                 f"pyproject.toml's 'mamba' extra). Available now: {available_models()}"
             )
         raise KeyError(f"Unknown model '{model_name}'. Known models: {known_model_names()}")
+
+    print(f"--- {run_label} ---")
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
