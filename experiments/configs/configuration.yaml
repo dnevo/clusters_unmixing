@@ -123,28 +123,6 @@ model_evaluation:
           reduce: none          # options: none | mean
 
       normalization: with_quadratic   # options: without | with_quadratic
-      transform:
-        steps: []   # no transform
-      # without any transform:
-      # transform:
-      #   steps: []
-      # first_derivative only:
-      # transform:
-      #   steps:
-      #     - name: first_derivative
-      # PCA only:
-      # transform:
-      #   steps:
-      #     - name: pca
-      #       params:
-      #         n_components: 5
-      # first_derivative + PCA:
-      # transform:
-      #   steps:
-      #     - name: first_derivative
-      #     - name: pca
-      #       params:
-      #         n_components: 5
 
       num_pixels: 10000 # number of synthetic pixels generated
 
@@ -174,8 +152,6 @@ model_evaluation:
           reduce: none          # options: none | mean
 
       normalization: with_quadratic   # options: without | with_quadratic
-      transform:
-        steps: []   # no transform
 
       num_pixels: 10000 # number of synthetic pixels generated
 

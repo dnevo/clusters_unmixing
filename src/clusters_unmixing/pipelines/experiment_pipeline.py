@@ -13,8 +13,8 @@ from clusters_unmixing.core_math import apply_snr_noise, compute_correlation_mat
 from clusters_unmixing.data import generate_samples
 from clusters_unmixing.dataio import load_wavelength_and_cluster_matrix
 from clusters_unmixing.models.runner_registry import run_registered_model
-from clusters_unmixing.transforms.normalization import apply_normalization
-from clusters_unmixing.transforms.spectral_views import apply_transform, select_wavelength_ranges
+from clusters_unmixing.preprocessing.normalization import apply_normalization
+from clusters_unmixing.preprocessing.band_selection import select_wavelength_ranges
 
 def _planned_model_runs(exp: ExperimentConfig) -> list[dict[str, Any]]:
     model_params = {model.name: dict(model.params) for model in exp.model_evaluation.models}
@@ -23,7 +23,6 @@ def _planned_model_runs(exp: ExperimentConfig) -> list[dict[str, Any]]:
             "cluster_set": item.cluster_set,
             "bands_ranges": item.normalized_bands_ranges(),
             "normalization": item.normalization,
-            "transform_steps": item.normalized_transform_steps(),
             "models": [{"name": name, "params": dict(model_params[name])} for name in item.normalized_models()],
             "num_pixels": item.num_pixels,
             "snr_db": item.snr_db,
@@ -66,15 +65,6 @@ def _build_stage_projections(
     )
 
     projections.append(("normalized", projected_endmembers, projected_pixels))
-
-    for name, params in run["transform_steps"]:
-        projected_endmembers, projected_pixels = apply_transform(
-            endmembers=projected_endmembers, 
-            pixels=projected_pixels, 
-            kind=name, 
-            params=params
-        )
-        projections.append((name, projected_endmembers, projected_pixels))
 
     return projections
 

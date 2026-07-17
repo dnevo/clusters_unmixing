@@ -10,7 +10,7 @@ The project runs configured experiment batches that:
 
 - load one or more cluster CSV files
 - generate synthetic abundance vectors and mixed pixels
-- apply wavelength selection, normalization, and optional transform steps
+- apply wavelength selection and normalization
 - evaluate registered unmixing models
 - write summary CSV outputs for metrics and abundance previews
 - review those outputs in a notebook-friendly format
@@ -28,8 +28,8 @@ The default experiment configuration lives in `experiments/configs/configuration
 - `config/schema.py`: validated experiment configuration models and config loading
 - `data/synthetic.py`: synthetic abundance generation
 - `dataio.py`: cluster CSV loading
-- `transforms/spectral_views.py`: wavelength selection and transform steps
-- `transforms/normalization.py`: normalization helpers
+- `preprocessing/band_selection.py`: wavelength selection
+- `preprocessing/normalization.py`: normalization helpers
 - `core_math.py`: correlation metric computation, SNR noise application, and shared numeric helpers
 - `pipelines/experiment_pipeline.py`: experiment execution pipeline exposed as `run_experiments`
 - `utils/notebook_diagnostics.py`: notebook orchestration, tables, and plotting helpers
@@ -78,7 +78,7 @@ Key sections in the config:
 - `cluster_sets`: available input cluster CSV files
 - `metrics`: required non-empty list of correlation metrics to compute for projected endmembers (`cosine`, `sam`)
 - `model_evaluation.models`: model hyperparameters keyed by model name
-- `model_evaluation.runs`: concrete experiment runs including bands, normalization, transforms, noise level, pixel count, and selected models
+- `model_evaluation.runs`: concrete experiment runs including bands, normalization, noise level, pixel count, and selected models
 
 Relative paths in the config are resolved from the supplied project root.
 
@@ -92,7 +92,7 @@ Each run batch writes results under:
 
 At a high level:
 
-- `correlation_summary.csv` stores per-run, per-metric, per-stage correlation statistics (`raw`, `normalized`, and any configured transform stages such as `pca`)
+- `correlation_summary.csv` stores per-run, per-metric, per-stage correlation statistics (`raw`, `normalized`)
 - `model_summary.csv` stores one row per run and metric, with one column per configured model
 - `abundance_preview.csv` stores the notebook-ready abundance preview table with `pixel_index`, `source`, error columns, and `endmember_*` values
 

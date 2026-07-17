@@ -13,7 +13,7 @@ from clusters_unmixing.config.schema import BandRangeSpec
 from clusters_unmixing.core_math import apply_snr_noise
 from clusters_unmixing.dataio import load_wavelength_and_cluster_matrix
 from clusters_unmixing.pipelines import run_experiments
-from clusters_unmixing.transforms import apply_normalization
+from clusters_unmixing.preprocessing import apply_normalization
 pd.set_option('display.max_columns', 200)
 pd.set_option('display.width', 180)
 
@@ -175,7 +175,6 @@ def run_experiments_notebook(project_root: Path) -> None:
         cluster_set = run_cfg.cluster_set
         bands_ranges = run_cfg.normalized_bands_ranges()
         normalization = run_cfg.normalization
-        transform_label = run_cfg.normalized_transform()
         snr_db = run_cfg.snr_db
 
         bands_label = ", ".join(
@@ -188,7 +187,6 @@ def run_experiments_notebook(project_root: Path) -> None:
                     cluster_set,
                     bands_label,
                     normalization,
-                    transform_label,
                     run_cfg.num_pixels,
                     f'{snr_db:g} dB' if np.isfinite(snr_db) else 'inf',
                     ', '.join(run_cfg.normalized_models()),
@@ -198,7 +196,6 @@ def run_experiments_notebook(project_root: Path) -> None:
                 'cluster set',
                 'bands',
                 'normalization',
-                'transform',
                 'pixels',
                 'snr',
                 'models',

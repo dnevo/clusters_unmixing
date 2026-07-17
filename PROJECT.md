@@ -31,8 +31,8 @@ The project runs configured *experiment batches*. Each batch:
   spectra ("endmembers") over a wavelength axis;
 - generates synthetic abundance vectors and, from them, synthetic mixed pixel spectra
   (optionally with a tunable nonlinear mixing term and additive sensor noise);
-- applies wavelength-range selection, optional normalization, and optional spectral
-  transforms (first derivative, PCA) at each preprocessing "stage";
+- applies wavelength-range selection and optional normalization at each preprocessing
+  "stage";
 - computes endmember-separability correlation metrics (cosine similarity, spectral angle)
   at every stage, independent of any unmixing model;
 - evaluates every registered unmixing model (classical solvers and neural networks) on
@@ -126,8 +126,8 @@ src/clusters_unmixing/
   dataio.py                              cluster CSV loading (wavelength axis + endmember matrix)
   data/synthetic.py                      synthetic abundance vector generation
   core_math.py                           correlation metrics, SNR noise, GBM mixing (mix_pixels)
-  transforms/spectral_views.py           wavelength-range selection, first-derivative, PCA
-  transforms/normalization.py            quadratic-baseline normalization
+  preprocessing/band_selection.py        wavelength-range selection
+  preprocessing/normalization.py         quadratic-baseline normalization
   pipelines/experiment_pipeline.py       orchestrates a full experiment batch (run_experiments)
   models/
     runner_registry.py                   model name -> runner dispatch, tensor/device plumbing
@@ -160,10 +160,9 @@ For each configured run in `model_evaluation.runs`:
 5. **Add sensor noise.** `core_math.apply_snr_noise` adds Gaussian noise at the
    configured `snr_db`.
 6. **Build preprocessing stage projections.** Starting from the raw (noisy) pixels and
-   raw endmembers: select wavelength ranges (`transforms.spectral_views`), then apply
-   normalization (`transforms.normalization`), then apply each configured transform step
-   in order (`first_derivative`, `pca`). Each stage's `(endmembers, pixels)` pair is kept
-   for later comparison.
+   raw endmembers: select wavelength ranges (`preprocessing.band_selection`), then apply
+   normalization (`preprocessing.normalization`). Each stage's `(endmembers, pixels)` pair
+   is kept for later comparison.
 7. **Assess endmember separability per stage.** For each configured metric (`cosine`,
    `sam`) and each stage, `core_math.compute_correlation_matrix` /
    `summarize_correlation_matrix` report how collinear the endmembers are — this is
@@ -293,8 +292,6 @@ fairly (they never "trained" on any of it), unlike the supervised NN models.
     `reduce: none` (keep all bands) or `reduce: mean` (collapse the window to one value).
   - `normalization` — `without` or `with_quadratic` (subtracts a fixed quadratic
     baseline in wavelength space).
-  - `transform.steps` — ordered list of `first_derivative` and/or `pca` (PCA must come
-    after first-derivative if both are used).
   - `num_pixels` — synthetic pixel count (must be `> 10`).
   - `snr_db` — signal-to-noise ratio for additive Gaussian noise (`inf` for no noise).
   - `nonlinearity_gamma` — GBM nonlinearity strength in `[0, 1]` (default `0.0`, i.e.

@@ -8,7 +8,6 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from clusters_unmixing.models.runner_registry import known_model_names
 
 BandRangeSpec = tuple[float, float, str]
-TransformStepSpec = tuple[str, dict[str, Any]]
 
 
 ALLOWED_CORRELATION_METRICS = {"cosine", "sam"}
@@ -88,38 +87,11 @@ class BandRangeModel(BaseModel):
         return (float(self.range_um[0]), float(self.range_um[1]), str(self.reduce))
 
 
-class TransformStepModel(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    name: Literal["first_derivative", "pca"]
-    params: dict[str, Any] = Field(default_factory=dict)
-
-    @model_validator(mode="after")
-    def _validate_params(self) -> "TransformStepModel":
-        if self.name == "first_derivative":
-            if self.params:
-                raise ValueError("first_derivative does not accept params")
-        elif self.name == "pca":
-            if set(self.params) != {"n_components"}:
-                raise ValueError("pca only supports params.n_components")
-            n_components = self.params.get("n_components")
-            if isinstance(n_components, bool) or not isinstance(n_components, int):
-                raise ValueError("n_components must be an integer")
-            if n_components <= 0:
-                raise ValueError("n_components must be > 0")
-        return self
-
-    def to_spec(self) -> TransformStepSpec:
-        if self.name == "pca":
-            return (self.name, {"n_components": int(self.params["n_components"])})
-        return (self.name, {})
-
-
 class ModelRunConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     cluster_set: str
     bands_ranges: list[Any]
     normalization: str = "without"
-    transform: Any = Field(default_factory=lambda: {"steps": []})
     models: list[str]
     num_pixels: int
     snr_db: float
@@ -205,32 +177,6 @@ class ModelRunConfig(BaseModel):
 
     def serialized_bands_ranges(self) -> list[Any]:
         return _serialize_bands_ranges_for_config(self.normalized_bands_ranges())
-
-    def normalized_transform_steps(self) -> list[TransformStepSpec]:
-        raw = self.transform
-        if not isinstance(raw, dict) or "steps" not in raw or not isinstance(raw["steps"], list):
-            raise ValueError("Model run 'transform' must be an object with a 'steps' list")
-        steps = [TransformStepModel.model_validate(step).to_spec() for step in raw["steps"]]
-        names = [name for name, _ in steps]
-        if names.count("first_derivative") > 1:
-            raise ValueError("first_derivative may appear at most once")
-        if names.count("pca") > 1:
-            raise ValueError("pca may appear at most once")
-        if "pca" in names and "first_derivative" in names and names.index("pca") < names.index("first_derivative"):
-            raise ValueError("first_derivative must appear before pca")
-        return steps
-
-    def normalized_transform(self) -> str:
-        steps = self.normalized_transform_steps()
-        if not steps:
-            return "raw"
-        labels = []
-        for name, params in steps:
-            if name == "first_derivative":
-                labels.append(name)
-            elif name == "pca":
-                labels.append(f"pca(n_components={int(params['n_components'])})")
-        return "+".join(labels)
 
 
 class ModelEvaluationConfig(BaseModel):
