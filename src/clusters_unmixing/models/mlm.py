@@ -116,10 +116,15 @@ class MLM:
         p_candidates = torch.linspace(
             self.cfg.p_min, self.cfg.p_max, self.cfg.num_p_candidates, device=y.device, dtype=y.dtype
         )
-        p = p_candidates.view(-1, 1, 1)
-        denom = (1.0 - p * y.unsqueeze(0)).clamp_min(1e-6)
-        predicted = (1.0 - p) * y.unsqueeze(0) / denom
-        sse = ((predicted - x.unsqueeze(0)) ** 2).sum(dim=2)
+        # Looped (rather than broadcast over all candidates at once) so memory stays
+        # O(n_pixels * n_bands) instead of O(num_p_candidates * n_pixels * n_bands),
+        # which was large enough to OOM at thousands of pixels.
+        sse = torch.empty(self.cfg.num_p_candidates, y.shape[0], device=y.device, dtype=y.dtype)
+        for i in range(self.cfg.num_p_candidates):
+            p = p_candidates[i]
+            denom = (1.0 - p * y).clamp_min(1e-6)
+            predicted = (1.0 - p) * y / denom
+            sse[i] = ((predicted - x) ** 2).sum(dim=1)
         best_idx = sse.argmin(dim=0)
         return p_candidates[best_idx]
 

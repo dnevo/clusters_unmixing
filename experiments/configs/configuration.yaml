@@ -154,7 +154,7 @@ model_evaluation:
       # Generalized Bilinear Model nonlinearity strength in [0, 1] applied when
       # synthesizing pixels: 0.0 = standard linear mixing, 1.0 = Fan model
       # (full pairwise multiple-scattering interaction between endmembers).
-      nonlinearity_gamma: 0.0
+      nonlinearity_gamma: 0.4
 
       models:
         - sunsal
@@ -185,7 +185,7 @@ model_evaluation:
       # Generalized Bilinear Model nonlinearity strength in [0, 1] applied when
       # synthesizing pixels: 0.0 = standard linear mixing, 1.0 = Fan model
       # (full pairwise multiple-scattering interaction between endmembers).
-      nonlinearity_gamma: 0.0
+      nonlinearity_gamma: 0.2
 
       models:
         - sunsal
