@@ -1,5 +1,10 @@
 experiment_name: cluster_corr_options
 
+# Ask PyTorch/cuDNN/cuBLAS for bit-exact CUDA determinism, at a performance
+# cost (see pipelines/experiment_pipeline.py's _set_global_seeds docstring).
+# Automatically skipped for runs that include the mamba model.
+extra_reproducibility: false
+
 cluster_sets:
 
   - name: 6clusters_thomas

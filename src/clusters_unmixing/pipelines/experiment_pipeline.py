@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from asyncio import run
 import itertools
+import os
 import random
 from typing import Any
 
@@ -111,10 +112,44 @@ def _build_stage_projections(
 
     return projections
 
-def _set_global_seeds(seed: int) -> None:
+def _set_global_seeds(seed: int, extra_reproducibility: bool = False, skip_strict_determinism: bool = False) -> None:
+    """Reset every RNG this project touches, so a run's synthetic data and model
+    training are reproducible given the same seed and config.
+
+    Called once per experiment run (not once per process), so each run's
+    synthetic-pixel generation is independently reproducible regardless of run
+    order or how many runs came before it. ``torch.manual_seed`` also reseeds
+    CUDA's generators, so no separate ``torch.cuda.manual_seed_all`` call is
+    needed.
+
+    ``extra_reproducibility=True`` additionally asks for bit-exact CUDA
+    determinism, following PyTorch's own reproducibility recipe
+    (https://pytorch.org/docs/stable/notes/randomness.html), at a performance
+    cost:
+    - ``CUBLAS_WORKSPACE_CONFIG`` and ``PYTHONHASHSEED`` are read once, before
+      CUDA/interpreter start-up - setting them here only has any effect
+      because this function's first call (run 1, before any model has
+      touched CUDA) is also the first thing in the whole process that touches
+      CUDA. Re-setting them on later runs is a harmless no-op, not a fresh
+      application - don't move CUDA-touching code ahead of this call without
+      re-checking that assumption.
+    - ``torch.use_deterministic_algorithms(True)`` makes PyTorch raise instead
+      of silently falling back to a non-deterministic algorithm. The mamba
+      model's fused CUDA kernels (causal_conv1d/mamba_ssm) don't register a
+      deterministic implementation, so strict mode would make any run
+      containing mamba crash. Pass ``skip_strict_determinism=True`` for those
+      runs - see the caller in ``run_experiments()``, which checks the run's
+      model list.
+    """
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
+
+    if extra_reproducibility:
+        os.environ["PYTHONHASHSEED"] = str(seed)
+        os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
+        torch.backends.cudnn.benchmark = False
+        torch.use_deterministic_algorithms(not skip_strict_determinism)
 
 
 def _make_held_out_test_indices(n_pixels: int, test_fraction: float = 0.1) -> np.ndarray:
@@ -192,7 +227,8 @@ def run_experiments(exp: ExperimentConfig) -> dict[str, Any]:
         cluster_path = exp.resolve_path(cluster_cfg.path)
         wavelengths, raw_endmembers = load_wavelength_and_cluster_matrix(cluster_path)
 
-        _set_global_seeds(0)
+        run_has_mamba = any(model_spec["name"] == "mamba" for model_spec in run["models"])
+        _set_global_seeds(0, extra_reproducibility=exp.extra_reproducibility, skip_strict_determinism=run_has_mamba)
         raw_pixels, true_abundances = _make_synthetic_pixels(
             raw_endmembers,
             run["num_pixels"],

@@ -262,6 +262,15 @@ class ExperimentConfig(BaseModel):
     models: list[ModelSpecConfig] = Field(default_factory=list)
     runs: list[ModelRunConfig] = Field(default_factory=list, validate_default=True)
     project_root: Path
+    extra_reproducibility: bool = Field(
+        False,
+        description=(
+            "Ask PyTorch/cuDNN/cuBLAS for bit-exact CUDA determinism (see "
+            "pipelines/experiment_pipeline.py's _set_global_seeds docstring), at a "
+            "performance cost. Automatically skipped for runs that include the mamba "
+            "model, whose fused CUDA kernels don't support it."
+        ),
+    )
 
     @field_validator("metrics")
     @classmethod
