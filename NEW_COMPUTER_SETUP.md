@@ -62,7 +62,7 @@ PowerShell example:
 ```powershell
 cd H:\repos\clusters_unmixing
 git status --short
-git add README.md pyproject.toml requirements.txt main.py src notebooks experiments data .vscode NEW_COMPUTER_SETUP.md
+git add README.md pyproject.toml main.py src notebooks experiments data .vscode NEW_COMPUTER_SETUP.md
 git status --short
 git commit -m "Prepare project for new computer setup"
 git push origin main
@@ -91,7 +91,6 @@ git status --short --ignored
 In this repo, the following are important:
 
 ```text
-# data/6clusters_digitized.csv (deprecated, being removed)
 data/6clusters_thomas.csv
 experiments/configs/configuration.yaml
 ```
@@ -287,19 +286,6 @@ python -m pip install --upgrade pip
 python -m pip install -e .
 ```
 
-The repo has:
-
-```text
-pyproject.toml
-requirements.txt
-```
-
-Prefer:
-
-```powershell
-python -m pip install -e .
-```
-
 This installs the project package in editable mode and installs dependencies from `pyproject.toml`.
 
 For notebook use, also install notebook-only dependencies:
@@ -347,7 +333,7 @@ H:\repos\clusters_unmixing\.venv\Scripts\python.exe
 Open:
 
 ```text
-notebooks/00_clusters_unmixing_experiments.ipynb
+notebooks/experiment_review.ipynb
 ```
 
 In the top-right kernel selector, choose the same environment:

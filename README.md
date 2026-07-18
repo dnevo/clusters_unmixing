@@ -2,7 +2,7 @@
 
 A compact spectral unmixing experiment framework for comparing preprocessing choices and unmixing models on configurable cluster sets.
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/dnevo/clusters_unmixing/blob/main/notebooks/00_clusters_unmixing_experiments.ipynb)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/dnevo/clusters_unmixing/blob/main/notebooks/experiment_review.ipynb)
 
 ## What the project does
 
@@ -20,7 +20,7 @@ The default experiment configuration lives in `experiments/configs/configuration
 ## Main entry points
 
 - `main.py`: runs the configured experiment batch from the command line
-- `notebooks/00_clusters_unmixing_experiments.ipynb`: interactive notebook for reviewing experiment outputs, spectra, metrics, abundance tables, and synthetic pixel previews
+- `notebooks/experiment_review.ipynb`: interactive notebook for reviewing experiment outputs, spectra, metrics, abundance tables, and synthetic pixel previews
 - `notebooks/_notebook_smoke.py`: scriptable smoke test for the notebook flow
 
 ## Core modules
@@ -62,7 +62,7 @@ Run the notebook smoke path:
 python notebooks/_notebook_smoke.py
 ```
 
-Open `notebooks/00_clusters_unmixing_experiments.ipynb` for interactive review.
+Open `notebooks/experiment_review.ipynb` for interactive review.
 
 If your editor reports unresolved imports for `plotly` or `IPython` in the notebook helpers, that usually means the notebook-only dependencies have not been installed into the active interpreter yet.
 

@@ -19,3 +19,9 @@ dist/
 
 # Generated experiment outputs
 experiments/outputs/
+
+# Stray Electron/Chromium crashpad logs
+debug.log
+
+# Local-only Claude Code permission overrides
+.claude/settings.local.json
