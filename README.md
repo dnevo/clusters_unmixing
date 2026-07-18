@@ -77,8 +77,8 @@ Key sections in the config:
 - `experiment_name`: output folder name under `experiments/outputs/`
 - `cluster_sets`: available input cluster CSV files
 - `metrics`: required non-empty list of correlation metrics to compute for projected endmembers (`cosine`, `sam`)
-- `model_evaluation.models`: model hyperparameters keyed by model name
-- `model_evaluation.runs`: concrete experiment runs including bands, normalization, noise level, pixel count, and selected models
+- `models`: model hyperparameters keyed by model name
+- `runs`: concrete experiment runs including bands, normalization, noise level, pixel count, and selected models
 
 Relative paths in the config are resolved from the supplied project root.
 

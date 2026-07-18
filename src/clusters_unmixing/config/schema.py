@@ -102,12 +102,12 @@ class BandRangeModel(BaseModel):
 
 class ModelSelectionEntry(BaseModel):
     """One entry in a run's `models` list: either a bare model name (run once with
-    the model's catalog defaults from model_evaluation.models) or a single-key
+    the model's catalog defaults from the top-level `models` list) or a single-key
     mapping `name: {param: [values]}` sweeping that model over a param grid.
 
-    Cross-checking the name/params against the model_evaluation.models catalog
-    needs sibling data this model doesn't have, so that part happens in
-    ModelEvaluationConfig._validate_models_against_catalog instead.
+    Cross-checking the name/params against the top-level `models` catalog needs
+    sibling data this model doesn't have, so that part happens in
+    ExperimentConfig._validate_models_against_catalog instead.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -157,7 +157,7 @@ class ModelRunConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     cluster_set: str
     bands_ranges: list[Any]
-    normalization: str = "without"
+    normalization: str = "none"
     models: list[ModelSelectionEntry]
     sweep_params: dict[str, list[Any]] = Field(default_factory=dict)
     num_pixels: int
@@ -202,8 +202,8 @@ class ModelRunConfig(BaseModel):
     @classmethod
     def _validate_normalization(cls, value: str) -> str:
         normalized = value.strip().lower()
-        if normalized not in {"without", "with_quadratic"}:
-            raise ValueError("Model run 'normalization' must be one of: without, with_quadratic")
+        if normalized not in {"none", "quadratic"}:
+            raise ValueError("Model run 'normalization' must be one of: none, quadratic")
         return normalized
 
     @field_validator("snr_db")
@@ -254,45 +254,13 @@ class ModelRunConfig(BaseModel):
         return _serialize_bands_ranges_for_config(self.normalized_bands_ranges())
 
 
-class ModelEvaluationConfig(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    models: list[ModelSpecConfig] = Field(default_factory=list)
-    runs: list[ModelRunConfig] = Field(default_factory=list, validate_default=True)
-
-    @field_validator("runs")
-    @classmethod
-    def _validate_runs(cls, value: list[ModelRunConfig]) -> list[ModelRunConfig]:
-        if not value:
-            raise ValueError("model_evaluation.runs must contain at least one run")
-        return value
-
-    @model_validator(mode="after")
-    def _validate_models_against_catalog(self) -> "ModelEvaluationConfig":
-        catalog = {model.normalized_name(): model.params for model in self.models}
-        for run in self.runs:
-            for entry in run.models:
-                if entry.name not in catalog:
-                    raise ValueError(
-                        f"run references model '{entry.name}', which is not defined in "
-                        f"model_evaluation.models"
-                    )
-                if entry.param_sweep:
-                    default_params = catalog[entry.name]
-                    unknown = sorted(set(entry.param_sweep) - set(default_params))
-                    if unknown:
-                        raise ValueError(
-                            f"model '{entry.name}' has swept parameter(s) {unknown} not present in "
-                            f"its default params {sorted(default_params)}"
-                        )
-        return self
-
-
 class ExperimentConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
     experiment_name: str = "correlation_experiment"
     cluster_sets: list[ClusterSetConfig]
     metrics: list[str]
-    model_evaluation: ModelEvaluationConfig
+    models: list[ModelSpecConfig] = Field(default_factory=list)
+    runs: list[ModelRunConfig] = Field(default_factory=list, validate_default=True)
     project_root: Path
 
     @field_validator("metrics")
@@ -308,11 +276,36 @@ class ExperimentConfig(BaseModel):
             raise ValueError(f"Unsupported correlation metrics: {sorted(set(invalid))}")
         return normalized
 
+    @field_validator("runs")
+    @classmethod
+    def _validate_runs(cls, value: list[ModelRunConfig]) -> list[ModelRunConfig]:
+        if not value:
+            raise ValueError("runs must contain at least one run")
+        return value
+
+    @model_validator(mode="after")
+    def _validate_models_against_catalog(self) -> "ExperimentConfig":
+        catalog = {model.normalized_name(): model.params for model in self.models}
+        for run in self.runs:
+            for entry in run.models:
+                if entry.name not in catalog:
+                    raise ValueError(
+                        f"run references model '{entry.name}', which is not defined in 'models'"
+                    )
+                if entry.param_sweep:
+                    default_params = catalog[entry.name]
+                    unknown = sorted(set(entry.param_sweep) - set(default_params))
+                    if unknown:
+                        raise ValueError(
+                            f"model '{entry.name}' has swept parameter(s) {unknown} not present in "
+                            f"its default params {sorted(default_params)}"
+                        )
+        return self
+
     @classmethod
     def from_dict(cls, raw: dict[str, Any], project_root: Path) -> "ExperimentConfig":
         payload = dict(raw)
         payload["cluster_sets"] = [ClusterSetConfig.model_validate(item) for item in raw["cluster_sets"]]
-        payload["model_evaluation"] = ModelEvaluationConfig.model_validate(raw["model_evaluation"])
         payload["project_root"] = Path(project_root).resolve()
         return cls.model_validate(payload)
 

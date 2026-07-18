@@ -145,7 +145,7 @@ pipeline level; the model layer converts to PyTorch tensors (CUDA if available) 
 
 ## End-to-end data flow
 
-For each configured run in `model_evaluation.runs`:
+For each configured run in `runs`:
 
 1. **Load the cluster set.** `dataio.load_wavelength_and_cluster_matrix` reads the CSV
    into a wavelength axis and an `(n_endmembers, n_bands)` matrix, preserving column
@@ -220,8 +220,8 @@ pixel = sum_i a_i * m_i  +  gamma * sum_{i<j} a_i * a_j * (m_i ⊙ m_j)
 `gamma=0` recovers the LMM exactly; `gamma=1` is the Fan model (no free parameter per
 endmember pair, full pairwise interaction). This models the classic bilinear/GBM story
 of light bouncing once between two different materials before reaching the sensor. It's
-wired into `model_evaluation.runs[*].nonlinearity_gamma` in `configuration.yaml`, so any
-run can be swept from purely linear to strongly nonlinear.
+wired into `runs[*].nonlinearity_gamma` in `configuration.yaml`, so any run can be swept
+from purely linear to strongly nonlinear.
 
 As noted in the domain section, this project's specific cluster set (chemically graded
 variants of one soil, not optically distinct materials) doesn't have strong physical
@@ -283,23 +283,25 @@ fairly (they never "trained" on any of it), unlike the supervised NN models.
 - `cluster_sets` — list of `{name, path}` cluster CSVs available to runs.
 - `metrics` — required non-empty list of correlation metrics (`cosine`, `sam`) computed
   on endmembers at every preprocessing stage.
-- `model_evaluation.models` — per-model-name hyperparameters (validated per-model where
-  a stronger schema exists, e.g. `small_mlp`'s `SmallMLPParamsModel`; otherwise passed
-  through as a dict to that model's own `dataclass` config).
-- `model_evaluation.runs` — one or more concrete runs, each specifying:
+- `models` — per-model-name hyperparameters (validated per-model where a stronger
+  schema exists, e.g. `small_mlp`'s `SmallMLPParamsModel`; otherwise passed through as
+  a dict to that model's own `dataclass` config).
+- `runs` — one or more concrete runs, each specifying:
   - `cluster_set` — which entry in `cluster_sets` to use.
   - `bands_ranges` — one or more `[x_min, x_max]` (µm) wavelength windows, each with
     `reduce: none` (keep all bands) or `reduce: mean` (collapse the window to one value).
-  - `normalization` — `without` or `with_quadratic` (subtracts a fixed quadratic
-    baseline in wavelength space).
+  - `normalization` — `none` or `quadratic` (subtracts a fixed quadratic baseline
+    in wavelength space).
   - `num_pixels` — synthetic pixel count (must be `> 10`).
-  - `snr_db` — signal-to-noise ratio for additive Gaussian noise (`inf` for no noise).
+  - `snr_db` — signal-to-noise ratio in dB for additive Gaussian noise; higher means
+    less noise. Use `inf` for zero noise (noiseless pixels) - infinite SNR is the
+    mathematical way of saying "no noise".
   - `nonlinearity_gamma` — GBM nonlinearity strength in `[0, 1]` (default `0.0`, i.e.
     pure linear mixing).
   - `models` — which registered model names to run for this configuration. Each entry
-    is either a bare name (runs once using its unchanged defaults from
-    `model_evaluation.models`) or a single-key mapping `name: {param: [values]}`
-    sweeping that model over a param grid, e.g. `kan: {batch_size: [32, 128, 512]}`.
+    is either a bare name (runs once using its unchanged defaults from the top-level
+    `models` catalog above) or a single-key mapping `name: {param: [values]}` sweeping
+    that model over a param grid, e.g. `kan: {batch_size: [32, 128, 512]}`.
   - `sweep_params` (optional) — a cartesian product over run-level fields; only
     `num_pixels`, `snr_db`, `nonlinearity_gamma`, `normalization` are sweepable
     (`cluster_set`/`bands_ranges` are excluded — they're structural, not scalar grid

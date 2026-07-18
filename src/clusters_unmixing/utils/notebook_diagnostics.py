@@ -171,9 +171,8 @@ def run_experiments_notebook(project_root: Path) -> None:
 
     display(Markdown(f"**Experiment name:** `{result['experiment_name']}`\n\n**Output dir:** `{result['output_dir']}`"))
 
-    model_eval = experiment_config.model_evaluation
-    for run_index, run_cfg in enumerate(model_eval.runs, start=1):
-        display(Markdown(f'---\n## Run {run_index}/{len(model_eval.runs)}'))
+    for run_index, run_cfg in enumerate(experiment_config.runs, start=1):
+        display(Markdown(f'---\n## Run {run_index}/{len(experiment_config.runs)}'))
 
         cluster_set = run_cfg.cluster_set
         bands_ranges = run_cfg.normalized_bands_ranges()
@@ -232,7 +231,7 @@ def run_experiments_notebook(project_root: Path) -> None:
             normalization
         )
 
-        if normalization != 'without':
+        if normalization != 'none':
             display(plot_cluster_overview(
                 wavelength_axis=wavelength_axis_full,
                 endmembers=normalized_endmembers_full,

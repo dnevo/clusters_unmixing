@@ -41,10 +41,10 @@ def _run_overrides_label(overrides: dict[str, Any]) -> str:
 
 
 def _planned_model_runs(exp: ExperimentConfig) -> list[dict[str, Any]]:
-    model_params = {model.name: dict(model.params) for model in exp.model_evaluation.models}
+    model_params = {model.name: dict(model.params) for model in exp.models}
     planned: list[dict[str, Any]] = []
 
-    for parent_index, item in enumerate(exp.model_evaluation.runs, start=1):
+    for parent_index, item in enumerate(exp.runs, start=1):
         base = {
             "cluster_set": item.cluster_set,
             "bands_ranges": item.normalized_bands_ranges(),

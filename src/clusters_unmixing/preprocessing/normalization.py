@@ -12,8 +12,8 @@ def quadratic_normalize(spectra: np.ndarray, wavelengths: np.ndarray) -> np.ndar
 
 
 def apply_normalization(spectra: np.ndarray, wavelengths: np.ndarray, normalization: str) -> np.ndarray:
-    if normalization == 'without':
+    if normalization == 'none':
         return spectra
-    if normalization == 'with_quadratic':
+    if normalization == 'quadratic':
         return quadratic_normalize(spectra, wavelengths)
     raise ValueError(f'Unsupported normalization mode: {normalization}')

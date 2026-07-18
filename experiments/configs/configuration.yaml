@@ -5,184 +5,147 @@ cluster_sets:
   - name: 6clusters_thomas
     path: data/6clusters_thomas.csv
 
-  #- name: 6clusters_digitized
-  #  path: data/6clusters_digitized.csv
-
-# Metrics implemented in src/clusters_unmixing/core_math.py
 metrics:
   - cosine
   - sam
 
-model_evaluation:
-  # models registered in models/runner_registry.py
-  models:
+models:
 
-    - name: sunsal
-      params:
-        μ: 0.001
-        λ_reg: 0.0
-        max_iters: 300
-        tol: 1.0e-6
-        check_every: 10
-        verbose: false
+  - name: sunsal
+    params:
+      μ: 0.001
+      λ_reg: 0.0
+      max_iters: 300
+      tol: 1.0e-6
+      check_every: 10
+      verbose: false
 
-    - name: vpgdu
-      params:
-        initial_estimator_num_samples: 500
-        threshold: 1.0e-6
-        max_iters: 500
-        t: 10
-        verbose: false
+  - name: vpgdu
+    params:
+      initial_estimator_num_samples: 500
+      threshold: 1.0e-6
+      max_iters: 500
+      t: 10
+      verbose: false
 
-    - name: mlm
-      params:
-        # Multilinear Mixing Model (Heylen & Scheunders, 2016). p_min is
-        # negative (not just [0, 1)) because this project's own
-        # nonlinearity_gamma/GBM synthetic generator only ever increases
-        # reflectance relative to linear mixing, and MLM needs P<0 to fit
-        # that direction of deviation (see models/mlm.py docstring).
-        p_min: -5.0
-        p_max: 0.999
-        num_p_candidates: 201
-        refine_iters: 3
-        sunsal_mu: 0.05
-        sunsal_max_iters: 300
-        sunsal_tol: 1.0e-6
-        verbose: false
+  - name: mlm
+    params:
+      # Multilinear Mixing Model (Heylen & Scheunders, 2016). p_min is
+      # negative (not just [0, 1)) because this project's own
+      # nonlinearity_gamma/GBM synthetic generator only ever increases
+      # reflectance relative to linear mixing, and MLM needs P<0 to fit
+      # that direction of deviation (see models/mlm.py docstring).
+      p_min: -5.0
+      p_max: 0.999
+      num_p_candidates: 201
+      refine_iters: 3
+      sunsal_mu: 0.05
+      sunsal_max_iters: 300
+      sunsal_tol: 1.0e-6
+      verbose: false
 
-    - name: small_mlp
-      params:
-        hidden_dim_1: 64
-        hidden_dim_2: 32
-        epochs: 400
-        batch_size: 128
-        learning_rate: 0.001
-        weight_decay: 0.00001
-        lambda_recon: 0.1
-        clip_grad_norm: 1.0
-        patience: 20
-        verbose: true         # options: true | false
+  - name: small_mlp
+    params:
+      hidden_dim_1: 64
+      hidden_dim_2: 32
+      epochs: 400
+      batch_size: 128
+      learning_rate: 0.001
+      weight_decay: 0.00001
+      lambda_recon: 0.1
+      clip_grad_norm: 1.0
+      patience: 20
+      verbose: true         # options: true | false
 
-    - name: convnext1d
-      params:
-        epochs: 400
-        batch_size: 32
-        learning_rate: 0.001
-        weight_decay: 0.0001
-        dropout: 0.15
-        lambda_recon: 0.1
-        clip_grad_norm: 1.0
-        pool_bins: 8
-        kernel_size: 7
-        patience: 20
-        verbose: true         # options: true | false
+  - name: convnext1d
+    params:
+      epochs: 400
+      batch_size: 32
+      learning_rate: 0.001
+      weight_decay: 0.0001
+      dropout: 0.15
+      lambda_recon: 0.1
+      clip_grad_norm: 1.0
+      pool_bins: 8
+      kernel_size: 7
+      patience: 20
+      verbose: true         # options: true | false
 
-    - name: kan
-      params:
-        hidden_dim: 32
-        grid_size: 5
-        spline_order: 3
-        epochs: 400
-        batch_size: 128
-        learning_rate: 0.001
-        weight_decay: 0.00001
-        lambda_recon: 0.1
-        clip_grad_norm: 1.0
-        patience: 20
-        verbose: true         # options: true | false
+  - name: kan
+    params:
+      hidden_dim: 32
+      grid_size: 5
+      spline_order: 3
+      epochs: 400
+      batch_size: 128
+      learning_rate: 0.001
+      weight_decay: 0.00001
+      lambda_recon: 0.1
+      clip_grad_norm: 1.0
+      patience: 20
+      verbose: true         # options: true | false
 
-    - name: mamba
-      params:
-        d_model: 32
-        d_state: 16
-        d_conv: 4
-        expand: 2
-        depth: 1
-        patch_size: 8
-        epochs: 400
-        batch_size: 128
-        learning_rate: 0.001
-        weight_decay: 0.00001
-        lambda_recon: 0.1
-        clip_grad_norm: 1.0
-        patience: 20
-        verbose: true         # options: true | false
-  runs:
-    # run 1/2
-    - cluster_set: 6clusters_thomas
+  - name: mamba
+    params:
+      d_model: 32
+      d_state: 16
+      d_conv: 4
+      expand: 2
+      depth: 1
+      patch_size: 8
+      epochs: 400
+      batch_size: 128
+      learning_rate: 0.001
+      weight_decay: 0.00001
+      lambda_recon: 0.1
+      clip_grad_norm: 1.0
+      patience: 20
+      verbose: true         # options: true | false
 
-      bands_ranges:
-        # Chosen by an empirical sweep (train small_mlp, compare real
-        # abundance_rmse) across band-selection candidates: a narrower
-        # cosine-correlation-optimized selection (1.8-2.0um only) actually
-        # performed worse (rmse=0.148) than using nearly the full spectrum
-        # (rmse=0.079) - noise-averaging from more bands matters more than
-        # endmember separability here. Only the near-zero-signal sensor edge
-        # (0.35-0.40um) is trimmed.
-        - range_µm: [0.4, 2.5]
-          reduce: none          # options: none | mean
+runs:
+  # run 1/2
+  - cluster_set: 6clusters_thomas
 
-      normalization: with_quadratic   # options: without | with_quadratic
+    bands_ranges:
+      - range_µm: [0.4, 2.5]
+        reduce: none          # options: none | mean
 
-      num_pixels: 1000 # number of synthetic pixels generated
+    normalization: quadratic   # options: none | quadratic
 
-      # signal-to-noise ratio
-      snr_db: 20.0 # number (e.g 30.0) or inf (for no noise)
+    num_pixels: 1000 # number of synthetic pixels generated
 
-      # Generalized Bilinear Model nonlinearity strength in [0, 1] applied when
-      # synthesizing pixels: 0.0 = standard linear mixing, 1.0 = Fan model
-      # (full pairwise multiple-scattering interaction between endmembers).
-      nonlinearity_gamma: 0.4
+    # signal-to-noise ratio in dB; higher = less noise. Use inf for zero noise
+    # (noiseless pixels) - infinite SNR is the mathematical way of saying "no noise".
+    snr_db: 20.0
 
-      models:
-        - sunsal
-        - vpgdu
-        - mlm
-        #- small_mlp
-        #- convnext1d
-        #- kan
-        #- mamba
+    # Generalized Bilinear Model nonlinearity strength in [0, 1] applied when
+    # synthesizing pixels: 0.0 = standard linear mixing, 1.0 = Fan model
+    # (full pairwise multiple-scattering interaction between endmembers).
+    nonlinearity_gamma: 0.4
 
-    # run 2/2
-    - cluster_set: 6clusters_thomas
+    models:
+      - sunsal
+      - vpgdu
+      - mlm
 
-      bands_ranges:
+  # run 2/2
+  - cluster_set: 6clusters_thomas
 
-        - range_µm: [0.5, 2.5]
-          reduce: none          # options: none | mean
+    bands_ranges:
 
-      normalization: with_quadratic   # options: without | with_quadratic
+      - range_µm: [0.5, 2.5]
+        reduce: none          # options: none | mean
 
-      num_pixels: 1000 # number of synthetic pixels generated
+    normalization: quadratic   # options: none | quadratic
 
-      # signal-to-noise ratio
-      snr_db: 20.0 # number (e.g 30.0) or inf (for no noise)
+    num_pixels: 1000 # number of synthetic pixels generated
+    snr_db: 20.0
+    nonlinearity_gamma: 0.2
 
-      # Generalized Bilinear Model nonlinearity strength in [0, 1] applied when
-      # synthesizing pixels: 0.0 = standard linear mixing, 1.0 = Fan model
-      # (full pairwise multiple-scattering interaction between endmembers).
-      nonlinearity_gamma: 0.2
-
-      #models:
-        #- sunsal
-        #- vpgdu
-        #- mlm
-        #- small_mlp
-        #- kan
-        #- mamba
-
-      # Each 'models' entry is either a bare name (runs once with its unchanged
-      # defaults from model_evaluation.models above) or a single-key mapping
-      # 'name: {param: [values]}' sweeping that model over a param grid.
-      # 'sweep_params' (optional, sibling of 'models') is a cartesian product
-      # over run-level fields - only num_pixels, snr_db, nonlinearity_gamma,
-      # normalization are sweepable. Resolved executions = (sweep_params
-      # combinations) x (sum of each model entry's own param combinations).
-      models:
-        - sunsal
-        - vpgdu
-        - kan:
-            batch_size: [32, 128]
-      sweep_params:
-        snr_db: [20.0, 30.0]
-        #nonlinearity_gamma: [0.0, 0.2, 0.4]
+    models:
+      - sunsal
+      - vpgdu
+      - kan:
+          batch_size: [32, 128]
+    sweep_params:
+      snr_db: [20.0, 30.0]
