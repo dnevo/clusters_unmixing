@@ -271,6 +271,15 @@ class ExperimentConfig(BaseModel):
             "model, whose fused CUDA kernels don't support it."
         ),
     )
+    use_wandb: bool = Field(
+        False,
+        description=(
+            "Log each model call to Weights & Biases as its own run (see "
+            "wandb_logging.py), plus one extra summary run per batch that uploads the "
+            "final output CSVs as an artifact. Requires the 'wandb' extra "
+            "(`pip install -e .[wandb]`) and a logged-in wandb account."
+        ),
+    )
 
     @field_validator("metrics")
     @classmethod

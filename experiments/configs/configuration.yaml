@@ -5,6 +5,11 @@ experiment_name: cluster_corr_options
 # Automatically skipped for runs that include the mamba model.
 extra_reproducibility: false
 
+# Log each model call to Weights & Biases as its own run, plus a summary run
+# per batch that uploads the output CSVs as an artifact. Requires the 'wandb'
+# extra (pip install -e .[wandb]) and a logged-in wandb account.
+use_wandb: false
+
 cluster_sets:
 
   - name: 6clusters_thomas
@@ -117,40 +122,24 @@ runs:
 
     normalization: quadratic   # options: none | quadratic
 
-    num_pixels: 1000 # number of synthetic pixels generated
+    num_pixels: 10000 # number of synthetic pixels generated
 
     # signal-to-noise ratio in dB; higher = less noise. Use inf for zero noise
     # (noiseless pixels) - infinite SNR is the mathematical way of saying "no noise".
-    snr_db: 20.0
+    snr_db: 30.0
 
     # Generalized Bilinear Model nonlinearity strength in [0, 1] applied when
     # synthesizing pixels: 0.0 = standard linear mixing, 1.0 = Fan model
     # (full pairwise multiple-scattering interaction between endmembers).
-    nonlinearity_gamma: 0.4
+    nonlinearity_gamma: 0.0
 
     models:
       - sunsal
       - vpgdu
       - mlm
+      - small_mlp
+      - kan
+      - mamba
 
-  # run 2/2
-  - cluster_set: 6clusters_thomas
-
-    bands_ranges:
-
-      - range_µm: [0.5, 2.5]
-        reduce: none          # options: none | mean
-
-    normalization: quadratic   # options: none | quadratic
-
-    num_pixels: 1000 # number of synthetic pixels generated
-    snr_db: 20.0
-    nonlinearity_gamma: 0.2
-
-    models:
-      - sunsal
-      - vpgdu
-      - kan:
-          batch_size: [32, 128]
     sweep_params:
-      snr_db: [20.0, 30.0]
+      nonlinearity_gamma: [0.0, 0.25]

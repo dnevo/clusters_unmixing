@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from asyncio import run
+from datetime import datetime
 import itertools
 import os
 import random
@@ -17,6 +18,7 @@ from clusters_unmixing.dataio import load_wavelength_and_cluster_matrix
 from clusters_unmixing.models.runner_registry import run_registered_model
 from clusters_unmixing.preprocessing.normalization import apply_normalization
 from clusters_unmixing.preprocessing.band_selection import select_wavelength_ranges
+from clusters_unmixing.wandb_logging import log_batch_artifacts, log_model_run
 
 def _expand_param_grid(params: dict[str, list[Any]]) -> list[dict[str, Any]]:
     """Cartesian product of a {param_name: [values]} mapping. No keys -> one empty combination."""
@@ -214,6 +216,10 @@ def run_experiments(exp: ExperimentConfig) -> dict[str, Any]:
     output_dir.mkdir(parents=True, exist_ok=True)
     runs = _planned_model_runs(exp)
 
+    # Groups every W&B run this batch logs (one per model call, plus the
+    # summary run at the end) so they stay browsable together in the W&B UI.
+    wandb_group = f"{exp.experiment_name}_{datetime.now():%Y%m%d-%H%M%S}"
+
     correlation_summary_rows: list[dict[str, Any]] = []
     model_summary_rows: list[dict[str, Any]] = []
     abundance_preview_rows: list[dict[str, Any]] = []
@@ -259,7 +265,7 @@ def run_experiments(exp: ExperimentConfig) -> dict[str, Any]:
 
         preview_pixels = np.random.choice(true_abundances.shape[0], size=5, replace=False).tolist()
         preview_pixels.sort()
-        abundance_preview_rows.extend(
+        true_preview_rows = [
             _abundance_preview_row(
                 idx,
                 parent_run_index,
@@ -271,10 +277,11 @@ def run_experiments(exp: ExperimentConfig) -> dict[str, Any]:
                 rmse(true_abundances[sample_idx] @ projected_endmembers, projected_pixels[sample_idx]),
             )
             for sample_idx in preview_pixels
-        )
+        ]
+        abundance_preview_rows.extend(true_preview_rows)
 
         for model_spec in run['models']:
-            abundances, _ = run_registered_model(
+            abundances, diagnostics = run_registered_model(
                 model_name=model_spec['name'],
                 endmembers=projected_endmembers,
                 pixels=projected_pixels,
@@ -292,10 +299,11 @@ def run_experiments(exp: ExperimentConfig) -> dict[str, Any]:
             test_true_abundances = true_abundances[test_indices]
             test_projected_pixels = projected_pixels[test_indices]
             reconstructed_pixels = test_abundances_pred @ projected_endmembers
-            for metric_name, value in [
-                ('abundance_rmse', rmse(test_abundances_pred, test_true_abundances)),
-                ('reconstruction_rmse', rmse(reconstructed_pixels, test_projected_pixels)),
-            ]:
+            model_metrics = {
+                'abundance_rmse': rmse(test_abundances_pred, test_true_abundances),
+                'reconstruction_rmse': rmse(reconstructed_pixels, test_projected_pixels),
+            }
+            for metric_name, value in model_metrics.items():
                 model_summary_rows.append({
                     'run_index': idx,
                     'parent_run_index': parent_run_index,
@@ -304,19 +312,42 @@ def run_experiments(exp: ExperimentConfig) -> dict[str, Any]:
                     'metric': metric_name,
                     'mean': value,
                 })
+            model_preview_rows = []
             for sample_idx in preview_pixels:
                 pred_abundances = abundances[sample_idx]
-                abundance_preview_rows.append(
-                    _abundance_preview_row(
-                        idx,
-                        parent_run_index,
-                        run_overrides_label,
-                        sample_idx,
-                        model_spec['label'],
-                        pred_abundances,
-                        rmse(pred_abundances, true_abundances[sample_idx]),
-                        rmse(pred_abundances @ projected_endmembers, projected_pixels[sample_idx]),
-                    )
+                row = _abundance_preview_row(
+                    idx,
+                    parent_run_index,
+                    run_overrides_label,
+                    sample_idx,
+                    model_spec['label'],
+                    pred_abundances,
+                    rmse(pred_abundances, true_abundances[sample_idx]),
+                    rmse(pred_abundances @ projected_endmembers, projected_pixels[sample_idx]),
+                )
+                abundance_preview_rows.append(row)
+                model_preview_rows.append(row)
+
+            if exp.use_wandb:
+                log_model_run(
+                    project=exp.experiment_name,
+                    group=wandb_group,
+                    run_name=f"run{idx}-{model_spec['label']}",
+                    config={
+                        'run_index': idx,
+                        'parent_run_index': parent_run_index,
+                        'run_overrides': run['run_overrides'],
+                        'cluster_set': run['cluster_set'],
+                        'normalization': run['normalization'],
+                        'num_pixels': run['num_pixels'],
+                        'snr_db': run['snr_db'],
+                        'nonlinearity_gamma': run['nonlinearity_gamma'],
+                        'model_name': model_spec['name'],
+                        'model_label': model_spec['label'],
+                        **model_spec['params'],
+                    },
+                    metrics={**model_metrics, **diagnostics},
+                    abundance_preview_rows=true_preview_rows + model_preview_rows,
                 )
 
     correlation_summary_path = output_dir / 'correlation_summary.csv'
@@ -337,6 +368,20 @@ def run_experiments(exp: ExperimentConfig) -> dict[str, Any]:
     abundance_preview_df.sort_values(['run_index', 'pixel_index', 'source_order', 'source']).drop(
         columns='source_order'
     ).to_csv(abundance_preview_path, index=False, float_format='%.6f')
+
+    if exp.use_wandb:
+        log_batch_artifacts(
+            project=exp.experiment_name,
+            group=wandb_group,
+            run_name=f"{exp.experiment_name}-summary",
+            artifact_name=f"{exp.experiment_name}-outputs",
+            csv_paths={
+                'correlation_summary': correlation_summary_path,
+                'model_summary': model_summary_path,
+                'abundance_preview': abundance_preview_path,
+            },
+        )
+
     return {
         'experiment_name': exp.experiment_name,
         'output_dir': str(output_dir),

@@ -75,6 +75,8 @@ If your editor reports unresolved imports for `plotly` or `IPython` in the noteb
 Key sections in the config:
 
 - `experiment_name`: output folder name under `experiments/outputs/`
+- `extra_reproducibility`: opt-in bit-exact CUDA determinism (performance cost; auto-skipped for runs including `mamba`)
+- `use_wandb`: opt-in Weights & Biases logging - one run per model call plus a batch summary run with the output CSVs as an artifact; requires `pip install -e .[wandb]` and a logged-in wandb account
 - `cluster_sets`: available input cluster CSV files
 - `metrics`: required non-empty list of correlation metrics to compute for projected endmembers (`cosine`, `sam`)
 - `models`: model hyperparameters keyed by model name
