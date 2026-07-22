@@ -168,7 +168,9 @@ class ModelRunConfig(BaseModel):
             "Generalized Bilinear Model (GBM) nonlinearity strength in [0, 1] used when "
             "synthesizing pixels from abundances and endmembers. 0.0 keeps the standard "
             "linear mixing model; 1.0 is the Fan model (full pairwise multiple-scattering "
-            "interaction between endmembers)."
+            "interaction between endmembers). For chemically graded cluster sets (e.g. "
+            "6clusters_thomas), this is a numerical robustness knob, not a physical model "
+            "of distinct materials interacting."
         ),
     )
 

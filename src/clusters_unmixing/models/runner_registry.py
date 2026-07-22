@@ -8,6 +8,7 @@ import torch
 from .small_mlp import SmallMLPConfig, SmallMLPUnmixing
 from .convnext1d import ConvNeXt1DConfig, ConvNeXt1DUnmixing
 from .kan import KANConfig, KANUnmixing
+from .gbm import GBM, GBMConfig
 from .mlm import MLM, MLMConfig
 from .sunsal import SunSAL, SunSALConfig
 from .vpgdu import VPGDU, VPGDUConfig
@@ -43,6 +44,18 @@ def _run_mlm(endmembers: torch.Tensor, pixels: torch.Tensor, true_abundances: to
         "last_active_pixels": int(pixels.shape[0]),
         "p_mean": float((history.get("p_mean") or [0.0])[-1]),
         "p_std": float((history.get("p_std") or [0.0])[-1]),
+    }
+
+
+def _run_gbm(endmembers: torch.Tensor, pixels: torch.Tensor, true_abundances: torch.Tensor, params: dict[str, Any], test_indices: torch.Tensor | None, run_label: str | None) -> tuple[torch.Tensor, dict[str, Any]]:
+    solver = GBM(GBMConfig(**dict(params)))
+    abundances = solver.solve(endmembers, pixels)
+    history = getattr(solver, "history", {}) or {}
+    return abundances, {
+        "iterations_logged": int(solver.cfg.n_burnin + solver.cfg.n_samples),
+        "last_active_pixels": int(pixels.shape[0]),
+        "sigma2_mean": float((history.get("sigma2_mean") or [0.0])[-1]),
+        "alpha_accept_rate": float((history.get("alpha_accept_rate") or [0.0])[-1]),
     }
 
 
@@ -103,7 +116,7 @@ def _run_kan(endmembers: torch.Tensor, pixels: torch.Tensor, true_abundances: to
 
 
 _MODEL_REGISTRY: dict[str, ModelRunner] = {
-    "sunsal": _run_sunsal, "vpgdu": _run_vpgdu, "mlm": _run_mlm, "small_mlp": _run_small_mlp, "convnext1d": _run_convnext1d, "kan": _run_kan}
+    "sunsal": _run_sunsal, "vpgdu": _run_vpgdu, "mlm": _run_mlm, "gbm": _run_gbm, "small_mlp": _run_small_mlp, "convnext1d": _run_convnext1d, "kan": _run_kan}
 
 # Mamba requires the GPU-only mamba-ssm package (see pyproject.toml's "mamba"
 # extra); importing it is deferred and guarded so that its absence - the
@@ -144,7 +157,7 @@ def available_models() -> list[str]:
 # referencing "mamba" fails to even load on a machine without mamba-ssm,
 # instead of only failing when that specific model is actually invoked.
 KNOWN_MODEL_NAMES: frozenset[str] = frozenset(
-    {"sunsal", "vpgdu", "mlm", "small_mlp", "convnext1d", "kan", "mamba"}
+    {"sunsal", "vpgdu", "mlm", "gbm", "small_mlp", "convnext1d", "kan", "mamba"}
 )
 
 

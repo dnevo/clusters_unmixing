@@ -28,7 +28,7 @@ models:
       max_iters: 300
       tol: 1.0e-6
       check_every: 10
-      verbose: false
+      verbose: true
 
   - name: vpgdu
     params:
@@ -36,7 +36,7 @@ models:
       threshold: 1.0e-6
       max_iters: 500
       t: 10
-      verbose: false
+      verbose: true
 
   - name: mlm
     params:
@@ -52,7 +52,24 @@ models:
       sunsal_mu: 0.05
       sunsal_max_iters: 300
       sunsal_tol: 1.0e-6
-      verbose: false
+      verbose: true
+
+  - name: gbm
+    params:
+      # Generalized Bilinear Model (Halimi et al., 2011): per-pixel
+      # Metropolis-within-Gibbs sampler, see models/gbm.py. n_burnin/n_samples
+      # match the paper's own Section VI defaults (N_bi=300, N_r=700). Unlike
+      # every other model here, this one runs a ~1000-iteration MCMC chain
+      # per pixel (vectorized over pixels, not free) - expect it to be far
+      # slower than sunsal/vpgdu/mlm at num_pixels: 10000; lower n_burnin/
+      # n_samples first if you just want a quick comparison against mlm.
+      n_burnin: 300
+      n_samples: 700
+      sunsal_mu: 0.05
+      sunsal_max_iters: 300
+      sunsal_tol: 1.0e-6
+      check_every: 50
+      verbose: true
 
   - name: small_mlp
     params:
@@ -131,15 +148,18 @@ runs:
     # Generalized Bilinear Model nonlinearity strength in [0, 1] applied when
     # synthesizing pixels: 0.0 = standard linear mixing, 1.0 = Fan model
     # (full pairwise multiple-scattering interaction between endmembers).
-    nonlinearity_gamma: 0.0
+    # For 6clusters_thomas (chemically graded soil, not distinct materials), treat
+    # this as a numerical robustness knob rather than a physical simulation.
+    nonlinearity_gamma: 0.25
 
     models:
       - sunsal
-      - vpgdu
+      #- vpgdu
       - mlm
-      - small_mlp
-      - kan
-      - mamba
+      - gbm
+      #- small_mlp
+      #- kan
+      #- mamba
 
-    sweep_params:
-      nonlinearity_gamma: [0.0, 0.25]
+    #sweep_params:
+      #nonlinearity_gamma: [0.0, 0.25]

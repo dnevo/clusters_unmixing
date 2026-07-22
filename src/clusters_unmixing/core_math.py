@@ -15,7 +15,9 @@ def mix_pixels(abundances: np.ndarray, endmembers: np.ndarray, gamma: float = 0.
     extra ``a_i * a_j * (m_i ⊙ m_j)`` term (elementwise product of the two endmember
     spectra), approximating the multiple-scattering ("double bounce") interaction between
     two distinct materials touching at sub-pixel scale. Values in between interpolate
-    linearly between the two regimes.
+    linearly between the two regimes. For chemically graded soil cluster sets (e.g.
+    6clusters_thomas), treat gamma as a numerical robustness knob rather than a physically
+    motivated simulation, since the endmembers aren't optically distinct materials.
 
     Parameters
     ----------
