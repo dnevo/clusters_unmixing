@@ -275,6 +275,17 @@ class GBM:
 
         lb = lb.clamp_min(0.0)
         ub = torch.maximum(ub, torch.zeros_like(ub)).clamp_min(lb)  # degenerate -> [lb, lb]
+        # A pixel whose gradient is exactly zero in every free coordinate (alpha,
+        # gamma, and their sum) is already at a stationary point: every d == 0,
+        # so every interval() call above falls into the "no constraint" branch
+        # and ub stays +inf (amin of all +inf). Left as +inf, the line search
+        # below would set lam = +inf and _apply_step would then compute
+        # lam * df_alpha = inf * 0.0 = nan, permanently poisoning the pixel
+        # (NaN never satisfies the delta < tol convergence test, so it's never
+        # dropped from `active`). Since a zero gradient means no direction
+        # improves the objective, collapsing to lam = 0 (lb == ub) is exact,
+        # not an approximation - the step is genuinely a no-op either way.
+        ub = torch.where(torch.isinf(ub), lb, ub)
         return lb, ub
 
     def _apply_step(
