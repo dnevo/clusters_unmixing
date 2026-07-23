@@ -156,12 +156,14 @@ runs:
 
     models:
       - sunsal
-      #- vpgdu
+      - vpgdu
       - mlm
       - gbm
-      #- small_mlp
-      #- kan
-      #- mamba
+      - small_mlp
+      - kan
+      - mamba
 
-    #sweep_params:
-      #nonlinearity_gamma: [0.0, 0.25]
+    sweep_params:
+      snr_db: [30.0, 50.0]
+      normalization: [none, quadratic]
+      nonlinearity_gamma: [0.0, 0.25]

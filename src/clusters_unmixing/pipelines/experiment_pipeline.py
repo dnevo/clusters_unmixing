@@ -358,7 +358,12 @@ def run_experiments(exp: ExperimentConfig) -> dict[str, Any]:
     model_summary_df = pd.DataFrame(model_summary_rows)
     run_meta = model_summary_df[['run_index', 'parent_run_index', 'run_overrides']].drop_duplicates('run_index')
     model_pivot = model_summary_df.pivot(index=['run_index', 'metric'], columns='model', values='mean').reset_index()
-    model_cols = [c for c in model_pivot.columns if c not in ('run_index', 'metric')]
+    # pivot() sorts columns alphabetically; reorder to first-appearance order
+    # in model_summary_rows, which follows each run's `models` list as given
+    # in the experiment YAML, so the CSV's model columns read left-to-right
+    # in the same order the config lists them.
+    model_order = list(dict.fromkeys(model_summary_df['model']))
+    model_cols = [c for c in model_order if c in model_pivot.columns]
     model_pivot.merge(run_meta, on='run_index', how='left')[
         ['run_index', 'parent_run_index', 'run_overrides', 'metric'] + model_cols
     ].to_csv(model_summary_path, index=False, float_format='%.6f')
