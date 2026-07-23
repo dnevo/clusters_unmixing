@@ -52,10 +52,10 @@ def _run_gbm(endmembers: torch.Tensor, pixels: torch.Tensor, true_abundances: to
     abundances = solver.solve(endmembers, pixels)
     history = getattr(solver, "history", {}) or {}
     return abundances, {
-        "iterations_logged": int(solver.cfg.n_burnin + solver.cfg.n_samples),
+        "iterations_logged": int(solver.cfg.max_iters),
         "last_active_pixels": int(pixels.shape[0]),
-        "sigma2_mean": float((history.get("sigma2_mean") or [0.0])[-1]),
-        "alpha_accept_rate": float((history.get("alpha_accept_rate") or [0.0])[-1]),
+        "error_mean": float((history.get("error_mean") or [0.0])[-1]),
+        "active_fraction": float((history.get("active_fraction") or [0.0])[-1]),
     }
 
 

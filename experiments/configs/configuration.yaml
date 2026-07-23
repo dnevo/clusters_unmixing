@@ -56,19 +56,21 @@ models:
 
   - name: gbm
     params:
-      # Generalized Bilinear Model (Halimi et al., 2011): per-pixel
-      # Metropolis-within-Gibbs sampler, see models/gbm.py. n_burnin/n_samples
-      # match the paper's own Section VI defaults (N_bi=300, N_r=700). Unlike
-      # every other model here, this one runs a ~1000-iteration MCMC chain
-      # per pixel (vectorized over pixels, not free) - expect it to be far
-      # slower than sunsal/vpgdu/mlm at num_pixels: 10000; lower n_burnin/
-      # n_samples first if you just want a quick comparison against mlm.
-      n_burnin: 300
-      n_samples: 700
+      # Generalized Bilinear Model (Halimi et al., 2011): per-pixel projected
+      # gradient descent with a golden-section line search, following the
+      # authors' companion GDA algorithm (see models/gbm.py). max_iters/tol
+      # match the reference MATLAB code's own defaults (Niter=900, |DER|<1e-5),
+      # with per-pixel early stopping once a pixel converges. Unlike every
+      # other model here, this one still runs up to max_iters gradient steps
+      # per pixel (vectorized over pixels, not free) - expect it to be slower
+      # than sunsal/vpgdu/mlm at num_pixels: 10000; lower max_iters first if
+      # you just want a quick comparison against mlm.
+      max_iters: 900
+      tol: 1.0e-5
       sunsal_mu: 0.05
       sunsal_max_iters: 300
       sunsal_tol: 1.0e-6
-      check_every: 50
+      check_every: 10
       verbose: true
 
   - name: small_mlp
