@@ -25,7 +25,7 @@ models:
     params:
       μ: 0.001
       λ_reg: 0.0
-      max_iters: 300
+      max_iters: 400
       tol: 1.0e-6
       check_every: 10
       verbose: true
@@ -143,8 +143,12 @@ runs:
 
     num_pixels: 10000 # number of synthetic pixels generated
 
-    # signal-to-noise ratio in dB; higher = less noise. Use inf for zero noise
+    # signal-to-noise ratio in dB; higher = less noise. Use .inf for zero noise
     # (noiseless pixels) - infinite SNR is the mathematical way of saying "no noise".
+    # NOTE: the leading dot is required - YAML only parses ".inf" as float infinity;
+    # bare "inf" is read as the string "inf", which passes validation unnoticed here
+    # (sweep_params values aren't type-checked) and only fails deep in core_math.py's
+    # np.isinf() with a confusing TypeError.
     snr_db: 30.0
 
     # Generalized Bilinear Model nonlinearity strength in [0, 1] applied when
@@ -164,6 +168,6 @@ runs:
       - mamba
 
     sweep_params:
-      snr_db: [30.0, 50.0]
+      snr_db: [30.0, .inf]   # must be ".inf", not "inf" - see note above
       normalization: [none, quadratic]
       nonlinearity_gamma: [0.0, 0.25]

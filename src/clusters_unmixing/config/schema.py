@@ -19,6 +19,11 @@ SWEEPABLE_RUN_PARAMS = {"num_pixels", "snr_db", "nonlinearity_gamma", "normaliza
 
 
 def _validate_sweep_value_list(owner: str, key: str, values: Any) -> list[Any]:
+    # Note: values are Any-typed and not coerced/type-checked here (unlike the
+    # matching top-level field, e.g. snr_db's float validator below). A YAML
+    # config typo like bare `inf` instead of `.inf` for an snr_db sweep value
+    # silently parses as the string "inf" and passes through unnoticed - it only
+    # fails later, deep in core_math.py's np.isinf(), with a confusing TypeError.
     if not isinstance(values, list) or not values:
         raise ValueError(f"{owner}.{key} must be a non-empty list")
     if len(set(values)) != len(values):

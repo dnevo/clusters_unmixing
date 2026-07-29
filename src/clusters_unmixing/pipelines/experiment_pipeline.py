@@ -298,6 +298,15 @@ def run_experiments(exp: ExperimentConfig) -> dict[str, Any]:
             test_abundances_pred = abundances[test_indices]
             test_true_abundances = true_abundances[test_indices]
             test_projected_pixels = projected_pixels[test_indices]
+            # Always a plain linear reconstruction from the returned abundances -
+            # deliberately the same formula for every model, including nonlinear ones
+            # (gbm, mlm), so reconstruction_rmse is comparable apples-to-apples. This
+            # means it does NOT credit gbm/mlm for their own internally-fitted
+            # nonlinear correction term (per-pair gamma_ij, or scalar P - see their
+            # docstrings), so on nonlinearity_gamma>0 runs it shows a nonzero floor
+            # even for a perfectly recovered abundance vector; it's testing "do these
+            # abundances explain the pixel under plain LMM", not "how good was the
+            # model's own nonlinear fit".
             reconstructed_pixels = test_abundances_pred @ projected_endmembers
             model_metrics = {
                 'abundance_rmse': rmse(test_abundances_pred, test_true_abundances),

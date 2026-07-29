@@ -44,7 +44,12 @@ def apply_snr_noise(
     clean_pixels: np.ndarray,
     snr_db: float,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Centralized SNR application logic for both pipelines and diagnostics."""
+    """Centralized SNR application logic for both pipelines and diagnostics.
+
+    snr_db must be an actual float (use .inf, not YAML's bare inf, in configs -
+    see configuration.yaml). A stray string here raises a confusing TypeError
+    from np.isinf below rather than a clear validation error.
+    """
     if np.isinf(snr_db):
         return clean_pixels, np.zeros_like(clean_pixels)
 
