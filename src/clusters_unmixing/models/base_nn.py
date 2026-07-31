@@ -59,6 +59,10 @@ class BaseNNUnmixing(ABC):
     def _build_model(self, in_dim: int, out_dim: int) -> nn.Module:
         """Build and return the network mapping pixels -> abundances."""
 
+    def _prepare_model_for_training(self, x_train: torch.Tensor) -> None:
+        """Hook for a one-time, data-dependent setup pass before training starts
+        (e.g. KAN's B-spline grid calibration). No-op unless a subclass overrides it."""
+
     def _split_counts(self, n_samples: int) -> tuple[int, int, int]:
         train_count = int(n_samples * 0.70)
         val_count = int(n_samples * 0.20)
@@ -180,6 +184,7 @@ class BaseNNUnmixing(ABC):
         y_test = true_abundances_n_k[test_idx]
 
         model = self.model.to(device=device, dtype=dtype)
+        self._prepare_model_for_training(x_train)
 
         # AdamW (decoupled weight decay) rather than Adam: with plain Adam, weight
         # decay is folded into the gradient before the adaptive step, which shrinks

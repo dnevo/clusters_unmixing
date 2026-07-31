@@ -30,6 +30,7 @@ class KANConfig(TrainingConfig):
     spline_order: int = 3
     grid_range: tuple[float, float] = (-1.0, 1.0)
     scale_noise: float = 0.1
+    grid_eps: float = 0.02
 
 
 class _KANLinear(nn.Module):
@@ -43,12 +44,14 @@ class _KANLinear(nn.Module):
         spline_order: int,
         grid_range: tuple[float, float],
         scale_noise: float,
+        grid_eps: float = 0.02,
     ) -> None:
         super().__init__()
         self.in_features = in_features
         self.out_features = out_features
         self.grid_size = grid_size
         self.spline_order = spline_order
+        self.grid_eps = grid_eps
 
         step = (grid_range[1] - grid_range[0]) / grid_size
         grid = (
@@ -65,14 +68,14 @@ class _KANLinear(nn.Module):
         with torch.no_grad():
             self.spline_weight.normal_(mean=0.0, std=scale_noise / (grid_size + spline_order))
 
-    def _b_splines(self, x: torch.Tensor) -> torch.Tensor:
+    def _b_splines(self, x: torch.Tensor, grid: torch.Tensor | None = None) -> torch.Tensor:
         # Cox-de Boor recursion. x: (batch, in_features) -> (batch, in_features, grid_size + spline_order)
         # Forced fp32: this chains several divisions/subtractions of nearby grid
         # values, which loses more precision under fp16 autocast than a plain
         # matmul would - so it opts out of the outer autocast context.
         with torch.autocast(device_type="cuda", enabled=False):
             x = x.float()
-            grid = self.grid.float()
+            grid = (self.grid if grid is None else grid).float()
             x = x.unsqueeze(-1)
             bases = ((x >= grid[:, :-1]) & (x < grid[:, 1:])).to(x.dtype)
             for k in range(1, self.spline_order + 1):
@@ -87,6 +90,60 @@ class _KANLinear(nn.Module):
         spline_output = F.linear(spline_bases, self.spline_weight.reshape(self.out_features, -1))
         return base_output + spline_output
 
+    def _curve2coeff(self, x: torch.Tensor, y: torch.Tensor, grid: torch.Tensor) -> torch.Tensor:
+        # Least-squares fit of new-grid B-spline coefficients that reproduce the
+        # given (x, y) samples, used by update_grid to re-express the current
+        # spline function on a re-fitted grid without changing what it computes.
+        # x: (batch, in_features), y: (batch, in_features, out_features).
+        a = self._b_splines(x, grid).transpose(0, 1)  # (in_features, batch, coeff)
+        b = y.transpose(0, 1)  # (in_features, batch, out_features)
+        solution = torch.linalg.lstsq(a, b).solution  # (in_features, coeff, out_features)
+        return solution.permute(2, 0, 1).contiguous()  # (out_features, in_features, coeff)
+
+    @torch.no_grad()
+    def update_grid(self, x: torch.Tensor, margin: float = 0.01) -> None:
+        """Re-fit this layer's B-spline grid to the observed input distribution.
+
+        The grid starts as a fixed, arbitrary range (see KANConfig.grid_range) with
+        no knowledge of the actual input scale; most of its spline capacity can end
+        up wasted on regions the data never visits. Blending a data-quantile grid
+        with a uniform one (weighted by grid_eps) concentrates knots where the data
+        actually is while keeping the grid well-formed for outliers. Coefficients
+        are then re-solved (least squares) so the spline function's output is
+        preserved across the grid change.
+        """
+        batch = x.size(0)
+        splines = self._b_splines(x).permute(1, 0, 2)  # (in_features, batch, coeff)
+        orig_coeff = self.spline_weight.permute(1, 2, 0)  # (in_features, coeff, out_features)
+        unreduced_spline_output = torch.bmm(splines, orig_coeff).permute(1, 0, 2)  # (batch, in_features, out_features)
+
+        x_sorted = torch.sort(x, dim=0)[0]
+        grid_adaptive = x_sorted[
+            torch.linspace(0, batch - 1, self.grid_size + 1, dtype=torch.int64, device=x.device)
+        ]
+
+        uniform_step = (x_sorted[-1] - x_sorted[0] + 2 * margin) / self.grid_size
+        grid_uniform = (
+            torch.arange(self.grid_size + 1, dtype=torch.float32, device=x.device).unsqueeze(1)
+            * uniform_step
+            + x_sorted[0]
+            - margin
+        )
+
+        grid = self.grid_eps * grid_uniform + (1 - self.grid_eps) * grid_adaptive
+        grid = torch.cat(
+            [
+                grid[:1] - uniform_step * torch.arange(self.spline_order, 0, -1, device=x.device).unsqueeze(1),
+                grid,
+                grid[-1:] + uniform_step * torch.arange(1, self.spline_order + 1, device=x.device).unsqueeze(1),
+            ],
+            dim=0,
+        )
+
+        new_grid = grid.T.contiguous()
+        self.spline_weight.data.copy_(self._curve2coeff(x, unreduced_spline_output, new_grid))
+        self.grid.copy_(new_grid)
+
 
 class _AbundanceKAN(nn.Module):
     """Two-layer KAN that maps a spectrum to softmax abundances."""
@@ -100,15 +157,23 @@ class _AbundanceKAN(nn.Module):
         spline_order: int,
         grid_range: tuple[float, float],
         scale_noise: float,
+        grid_eps: float = 0.02,
     ) -> None:
         super().__init__()
-        self.layer1 = _KANLinear(in_dim, hidden_dim, grid_size, spline_order, grid_range, scale_noise)
-        self.layer2 = _KANLinear(hidden_dim, out_dim, grid_size, spline_order, grid_range, scale_noise)
+        self.layer1 = _KANLinear(in_dim, hidden_dim, grid_size, spline_order, grid_range, scale_noise, grid_eps)
+        self.layer2 = _KANLinear(hidden_dim, out_dim, grid_size, spline_order, grid_range, scale_noise, grid_eps)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.layer1(x)
         logits = self.layer2(x)
         return F.softmax(logits, dim=-1)
+
+    @torch.no_grad()
+    def update_grid(self, x: torch.Tensor) -> None:
+        """Calibrate each layer's B-spline grid to its actual input distribution,
+        propagating the (updated) layer1 activations forward to calibrate layer2."""
+        self.layer1.update_grid(x)
+        self.layer2.update_grid(self.layer1(x))
 
 
 class KANUnmixing(BaseNNUnmixing):
@@ -125,4 +190,11 @@ class KANUnmixing(BaseNNUnmixing):
             spline_order=self.cfg.spline_order,
             grid_range=self.cfg.grid_range,
             scale_noise=self.cfg.scale_noise,
+            grid_eps=self.cfg.grid_eps,
         )
+
+    def _prepare_model_for_training(self, x_train: torch.Tensor) -> None:
+        # One-shot calibration: re-fit each layer's B-spline grid to the actual
+        # training-pixel distribution before any gradient step, instead of leaving
+        # it pinned to the arbitrary static KANConfig.grid_range.
+        self.model.update_grid(x_train)
