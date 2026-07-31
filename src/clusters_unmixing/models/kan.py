@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
+from typing import cast
 
 import torch
 import torch.nn as nn
@@ -30,7 +31,16 @@ class KANConfig(TrainingConfig):
     spline_order: int = 3
     grid_range: tuple[float, float] = (-1.0, 1.0)
     scale_noise: float = 0.1
-    grid_eps: float = 0.02
+    # Weight on the uniform grid vs. raw data quantiles in update_grid's blend
+    # (see _KANLinear.update_grid). The efficient-kan reference default of 0.02
+    # leans almost entirely on empirical quantiles, which chases noise outliers
+    # under noisy + nonlinear/normalized pixel distributions; 0.3 trades some
+    # calibration precision for robustness to that noise.
+    grid_eps: float = 0.3
+    # Epochs of ordinary supervised training run before grid calibration, so
+    # layer2's grid is calibrated against layer1's actual (trained) activations
+    # rather than layer1's near-arbitrary output at random initialization.
+    grid_warmup_epochs: int = 5
 
 
 class _KANLinear(nn.Module):
@@ -58,6 +68,7 @@ class _KANLinear(nn.Module):
             torch.arange(-spline_order, grid_size + spline_order + 1, dtype=torch.float32) * step
             + grid_range[0]
         ).expand(in_features, -1).contiguous()
+        self.grid: torch.Tensor
         self.register_buffer("grid", grid)
 
         self.base_weight = nn.Parameter(torch.empty(out_features, in_features))
@@ -193,8 +204,48 @@ class KANUnmixing(BaseNNUnmixing):
             grid_eps=self.cfg.grid_eps,
         )
 
-    def _prepare_model_for_training(self, x_train: torch.Tensor) -> None:
-        # One-shot calibration: re-fit each layer's B-spline grid to the actual
-        # training-pixel distribution before any gradient step, instead of leaving
-        # it pinned to the arbitrary static KANConfig.grid_range.
-        self.model.update_grid(x_train)
+    def _prepare_model_for_training(
+        self,
+        x_train: torch.Tensor,
+        y_train: torch.Tensor,
+        endmembers_k_bands: torch.Tensor,
+    ) -> None:
+        # layer1's grid can be calibrated directly against x_train (the raw pixel
+        # distribution doesn't change during training), but layer2's grid needs
+        # layer1's *output* distribution - which at random init is close to
+        # arbitrary and a poor proxy for what layer1 actually produces once
+        # trained. So run a short supervised warm-up first (ordinary gradient
+        # steps on the real objective) and only then calibrate both layers'
+        # grids, using layer1's now-representative activations for layer2.
+        if self.cfg.grid_warmup_epochs > 0:
+            self._run_grid_warmup(x_train, y_train, endmembers_k_bands)
+        cast(_AbundanceKAN, self.model).update_grid(x_train)
+
+    def _run_grid_warmup(
+        self,
+        x_train: torch.Tensor,
+        y_train: torch.Tensor,
+        endmembers_k_bands: torch.Tensor,
+    ) -> None:
+        warmup_optimizer = torch.optim.AdamW(
+            self.model.parameters(),
+            lr=self.cfg.learning_rate,
+            weight_decay=self.cfg.weight_decay,
+        )
+        batch_size = max(1, min(int(self.cfg.batch_size), x_train.shape[0]))
+
+        self.model.train()
+        for _ in range(int(self.cfg.grid_warmup_epochs)):
+            permutation = torch.randperm(x_train.shape[0], device=x_train.device)
+            for start in range(0, x_train.shape[0], batch_size):
+                batch_idx = permutation[start : start + batch_size]
+                warmup_optimizer.zero_grad(set_to_none=True)
+                total_loss, _, _, _ = self._compute_losses(
+                    pixels=x_train[batch_idx],
+                    true_abundances=y_train[batch_idx],
+                    endmembers_k_bands=endmembers_k_bands,
+                )
+                total_loss.backward()
+                if self.cfg.clip_grad_norm > 0:
+                    torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.cfg.clip_grad_norm)
+                warmup_optimizer.step()
