@@ -12,7 +12,7 @@ import pandas as pd
 import torch
 
 from clusters_unmixing.config.schema import ExperimentConfig
-from clusters_unmixing.core_math import apply_snr_noise, compute_correlation_matrix, mix_pixels, rmse, summarize_correlation_matrix
+from clusters_unmixing.core_math import apply_snr_noise, compute_condition_number, compute_cosine_similarity_matrix, mix_pixels, rmse, summarize_cosine_similarity_matrix
 from clusters_unmixing.data import generate_samples
 from clusters_unmixing.dataio import load_wavelength_and_cluster_matrix
 from clusters_unmixing.models.runner_registry import run_registered_model
@@ -98,19 +98,20 @@ def _build_stage_projections(
         ("raw", endmembers_sel, pixels_sel)
     ]
 
-    projected_endmembers = apply_normalization(
-        spectra=endmembers_sel, 
-        wavelengths=wavelengths_sel, 
-        normalization=run["normalization"]
-    )
-    
-    projected_pixels = apply_normalization(
-        spectra=pixels_sel, 
-        wavelengths=wavelengths_sel, 
-        normalization=run["normalization"]
-    )
+    if run["normalization"] != "none":
+        projected_endmembers = apply_normalization(
+            spectra=endmembers_sel,
+            wavelengths=wavelengths_sel,
+            normalization=run["normalization"]
+        )
 
-    projections.append(("normalized", projected_endmembers, projected_pixels))
+        projected_pixels = apply_normalization(
+            spectra=pixels_sel,
+            wavelengths=wavelengths_sel,
+            normalization=run["normalization"]
+        )
+
+        projections.append(("normalized", projected_endmembers, projected_pixels))
 
     return projections
 
@@ -220,7 +221,7 @@ def run_experiments(exp: ExperimentConfig) -> dict[str, Any]:
     # summary run at the end) so they stay browsable together in the W&B UI.
     wandb_group = f"{exp.experiment_name}_{datetime.now():%Y%m%d-%H%M%S}"
 
-    correlation_summary_rows: list[dict[str, Any]] = []
+    cosine_similarity_summary_rows: list[dict[str, Any]] = []
     model_summary_rows: list[dict[str, Any]] = []
     abundance_preview_rows: list[dict[str, Any]] = []
 
@@ -250,20 +251,19 @@ def run_experiments(exp: ExperimentConfig) -> dict[str, Any]:
         )
         _, projected_endmembers, projected_pixels = stage_projections[-1]
         test_indices = _make_held_out_test_indices(projected_pixels.shape[0])
-        for metric_name in exp.metrics:
-            for stage_name, stage_endmembers, _ in stage_projections:
-                matrix = compute_correlation_matrix(stage_endmembers, metric_name)
-                correlation_summary_rows.append({
-                    'run_index': idx,
-                    'parent_run_index': parent_run_index,
-                    'run_overrides': run_overrides_label,
-                    'metric': metric_name,
-                    'stage': stage_name,
-                    **summarize_correlation_matrix(matrix),
-                })
+        for stage_name, stage_endmembers, _ in stage_projections:
+            matrix = compute_cosine_similarity_matrix(stage_endmembers)
+            cosine_similarity_summary_rows.append({
+                'run_index': idx,
+                'parent_run_index': parent_run_index,
+                'run_overrides': run_overrides_label,
+                'stage': stage_name,
+                'condition_number': compute_condition_number(stage_endmembers),
+                **summarize_cosine_similarity_matrix(matrix),
+            })
 
 
-        preview_pixels = np.random.choice(true_abundances.shape[0], size=5, replace=False).tolist()
+        preview_pixels = np.random.choice(true_abundances.shape[0], size=2, replace=False).tolist()
         preview_pixels.sort()
         true_preview_rows = [
             _abundance_preview_row(
@@ -359,10 +359,10 @@ def run_experiments(exp: ExperimentConfig) -> dict[str, Any]:
                     abundance_preview_rows=true_preview_rows + model_preview_rows,
                 )
 
-    correlation_summary_path = output_dir / 'correlation_summary.csv'
+    cosine_similarity_summary_path = output_dir / 'cosine_similarity_summary.csv'
     model_summary_path = output_dir / 'model_summary.csv'
     abundance_preview_path = output_dir / 'abundance_preview.csv'
-    pd.DataFrame(correlation_summary_rows).to_csv(correlation_summary_path, index=False, float_format='%.6f')
+    pd.DataFrame(cosine_similarity_summary_rows).to_csv(cosine_similarity_summary_path, index=False, float_format='%.6f')
 
     model_summary_df = pd.DataFrame(model_summary_rows)
     run_meta = model_summary_df[['run_index', 'parent_run_index', 'run_overrides']].drop_duplicates('run_index')
@@ -390,7 +390,7 @@ def run_experiments(exp: ExperimentConfig) -> dict[str, Any]:
             run_name=f"{exp.experiment_name}-summary",
             artifact_name=f"{exp.experiment_name}-outputs",
             csv_paths={
-                'correlation_summary': correlation_summary_path,
+                'cosine_similarity_summary': cosine_similarity_summary_path,
                 'model_summary': model_summary_path,
                 'abundance_preview': abundance_preview_path,
             },
@@ -399,7 +399,7 @@ def run_experiments(exp: ExperimentConfig) -> dict[str, Any]:
     return {
         'experiment_name': exp.experiment_name,
         'output_dir': str(output_dir),
-        'correlation_summary_path': str(correlation_summary_path),
+        'cosine_similarity_summary_path': str(cosine_similarity_summary_path),
         'n_runs': len(runs),
         'model_evaluation': {
             'n_runs': len(runs),

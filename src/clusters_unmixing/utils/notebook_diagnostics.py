@@ -21,9 +21,9 @@ pd.set_option('display.width', 180)
 def plot_cluster_overview(
     wavelength_axis: Any,
     endmembers: Any,
-    title: str,
     bands_ranges: list[BandRangeSpec] | None = None,
     y_title: str = 'Reflectance',
+    show_legend: bool = True,
 ) -> go.Figure:
     wavelength_axis_arr = np.asarray(wavelength_axis, dtype=float)
     endmembers_arr = np.asarray(endmembers, dtype=float)
@@ -66,6 +66,7 @@ def plot_cluster_overview(
         cluster_name = f'Cluster {idx + 1}'
         cluster_color = palette[idx % len(palette)]
         y = endmembers_arr[idx]
+        legend_shown = False
 
         for kind, dash_style in [('none', 'solid'), ('mean', 'dash'), ('outside', 'dot')]:
             kind_mask = point_kind == kind
@@ -80,10 +81,11 @@ def plot_cluster_overview(
                     mode='lines',
                     name=cluster_name,
                     legendgroup=cluster_name,
-                    showlegend=False,
-                    line={'color': cluster_color, 'dash': dash_style},
+                    showlegend=not legend_shown,
+                    line={'color': cluster_color, 'dash': dash_style, 'width': 3},
                     hovertemplate='cluster=%{fullData.name}<br>wavelength=%{x:.3f} um<br>value=%{y:.4f}<extra></extra>',
                 ))
+                legend_shown = True
 
                 if kind == 'mean':
                     mid_x = float((x_seg[0] + x_seg[-1]) / 2.0)
@@ -92,7 +94,7 @@ def plot_cluster_overview(
                         x=[float(x_seg[marker_idx])],
                         y=[float(y_seg[marker_idx])],
                         mode='markers',
-                        marker={'symbol': 'diamond', 'size': 10, 'color': cluster_color},
+                        marker={'symbol': 'diamond', 'size': 12, 'color': cluster_color},
                         name=cluster_name,
                         legendgroup=cluster_name,
                         showlegend=False,
@@ -100,10 +102,25 @@ def plot_cluster_overview(
                     ))
 
     fig.update_layout(
-        title=title,
         xaxis_title='Wavelength (µm)',
         yaxis_title=y_title,
-        height=480,
+        template='plotly_white',
+        font={'family': 'Arial, sans-serif', 'size': 18, 'color': 'black'},
+        showlegend=show_legend,
+        legend={
+            'title': {'text': 'Clusters', 'font': {'size': 18, 'color': 'black'}},
+            'font': {'size': 16, 'color': 'black'},
+            'orientation': 'h',
+            'yanchor': 'bottom',
+            'y': 1.02,
+            'xanchor': 'left',
+            'x': 0,
+        },
+        xaxis={'title': {'font': {'size': 20, 'color': 'black'}}, 'tickfont': {'size': 16, 'color': 'black'}},
+        yaxis={'title': {'font': {'size': 20, 'color': 'black'}}, 'tickfont': {'size': 16, 'color': 'black'}},
+        margin={'l': 80, 'r': 30, 't': 30, 'b': 70},
+        width=1000,
+        height=420,
     )
     return fig
 
@@ -159,13 +176,13 @@ def run_experiments_notebook(project_root: Path) -> None:
 
     model_summary_path = Path(result['model_evaluation']['model_summary_path'])
     abundance_preview_path = Path(result['model_evaluation']['abundance_preview_path'])
-    correlation_summary_path = Path(result['correlation_summary_path'])
+    cosine_similarity_summary_path = Path(result['cosine_similarity_summary_path'])
 
     # Not indexed by run_index here: a swept run expands into several resolved
     # run_index values sharing one parent_run_index, so filtering by
     # parent_run_index (below, per notebook section) is what actually maps back
     # to a single configured run.
-    correlation_df = pd.read_csv(correlation_summary_path)
+    cosine_similarity_df = pd.read_csv(cosine_similarity_summary_path)
     model_df = pd.read_csv(model_summary_path)
     abundance_df = pd.read_csv(abundance_preview_path)
 
@@ -217,37 +234,45 @@ def run_experiments_notebook(project_root: Path) -> None:
         cluster_path = cluster_paths[cluster_set]
         wavelength_axis_full, endmembers_full = load_wavelength_and_cluster_matrix(cluster_path)
 
+        display(Markdown(f'**Raw clusters | set={cluster_set}**'))
         display(plot_cluster_overview(
             wavelength_axis=wavelength_axis_full,
             endmembers=endmembers_full,
-            title=f'Raw clusters | set={cluster_set}',
             bands_ranges=bands_ranges,
             y_title='Reflectance',
         ))
 
         normalized_endmembers_full = apply_normalization(
-            endmembers_full, 
-            wavelength_axis_full, 
+            endmembers_full,
+            wavelength_axis_full,
             normalization
         )
 
         if normalization != 'none':
+            display(Markdown(f'**Normalized spectra | {cluster_set} | {normalization}**'))
             display(plot_cluster_overview(
                 wavelength_axis=wavelength_axis_full,
                 endmembers=normalized_endmembers_full,
-                title=f'Normalized spectra | {cluster_set} | {normalization}',
                 y_title='Value',
                 bands_ranges=bands_ranges,
+                show_legend=False,
             ))
 
-        run_correlation = correlation_df[correlation_df['parent_run_index'] == run_index].drop(
+        display(Markdown('### Endmember separability metrics'))
+        run_cosine_similarity = cosine_similarity_df[cosine_similarity_df['parent_run_index'] == run_index].drop(
             columns=['parent_run_index']
-        ).set_index(['run_index', 'run_overrides', 'metric', 'stage'])
-        display(run_correlation)
+        ).set_index(['run_index', 'run_overrides', 'stage'])
+        display(run_cosine_similarity.style.format({'condition_number': '{:.1f}'}))
 
         display(Markdown('### Model metrics'))
         run_model = model_df[model_df['parent_run_index'] == run_index].drop(columns=['parent_run_index'])
-        display(run_model.set_index(['run_index', 'run_overrides', 'metric']))
+        run_model_indexed = run_model.set_index(['run_index', 'run_overrides', 'metric'])
+
+        display(Markdown('#### Abundance RMSE'))
+        display(run_model_indexed.xs('abundance_rmse', level='metric', drop_level=False))
+
+        display(Markdown('#### Reconstruction RMSE'))
+        display(run_model_indexed.xs('reconstruction_rmse', level='metric', drop_level=False))
 
         abundance_rows = abundance_df[abundance_df['parent_run_index'] == run_index].drop(columns=['parent_run_index'])
         display(Markdown('### Abundances'))

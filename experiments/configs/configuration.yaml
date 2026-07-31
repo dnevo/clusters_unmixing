@@ -15,10 +15,6 @@ cluster_sets:
   - name: 6clusters_thomas
     path: data/6clusters_thomas.csv
 
-metrics:
-  - cosine
-  - sam
-
 models:
 
   - name: sunsal

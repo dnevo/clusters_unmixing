@@ -9,9 +9,6 @@ from clusters_unmixing.models.runner_registry import known_model_names
 
 BandRangeSpec = tuple[float, float, str]
 
-
-ALLOWED_CORRELATION_METRICS = {"cosine", "sam"}
-
 # Run-level fields eligible for sweep_params. Deliberately excludes cluster_set and
 # bands_ranges (both change array shapes downstream) and name/models/sweep_params
 # (structural, not data).
@@ -263,9 +260,8 @@ class ModelRunConfig(BaseModel):
 
 class ExperimentConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
-    experiment_name: str = "correlation_experiment"
+    experiment_name: str = "cosine_similarity_experiment"
     cluster_sets: list[ClusterSetConfig]
-    metrics: list[str]
     models: list[ModelSpecConfig] = Field(default_factory=list)
     runs: list[ModelRunConfig] = Field(default_factory=list, validate_default=True)
     project_root: Path
@@ -287,19 +283,6 @@ class ExperimentConfig(BaseModel):
             "(`pip install -e .[wandb]`) and a logged-in wandb account."
         ),
     )
-
-    @field_validator("metrics")
-    @classmethod
-    def _validate_metrics(cls, value: list[str]) -> list[str]:
-        if not value:
-            raise ValueError("Experiment 'metrics' must be non-empty")
-        normalized = [item.strip().lower() for item in value if item.strip()]
-        if len(normalized) != len(value):
-            raise ValueError("Experiment 'metrics' entries must be non-empty strings")
-        invalid = [name for name in normalized if name not in ALLOWED_CORRELATION_METRICS]
-        if invalid:
-            raise ValueError(f"Unsupported correlation metrics: {sorted(set(invalid))}")
-        return normalized
 
     @field_validator("runs")
     @classmethod

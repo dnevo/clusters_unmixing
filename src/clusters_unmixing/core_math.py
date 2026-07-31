@@ -60,24 +60,14 @@ def apply_snr_noise(
     return clean_pixels + noise, noise
 
 
-def _cosine_similarity_matrix(endmembers: np.ndarray) -> np.ndarray:
+def compute_cosine_similarity_matrix(endmembers: np.ndarray) -> np.ndarray:
     norms = np.linalg.norm(endmembers, axis=1, keepdims=True)
     norms = np.clip(norms, 1e-12, None)
     normalized = endmembers / norms
     return normalized @ normalized.T
 
 
-def compute_correlation_matrix(endmembers: np.ndarray, metric: str = "cosine") -> np.ndarray:
-    metric = metric.strip().lower()
-    if metric == "cosine":
-        return _cosine_similarity_matrix(endmembers)
-    if metric == "sam":
-        cosine = _cosine_similarity_matrix(endmembers)
-        return np.degrees(np.arccos(np.clip(cosine, -1.0, 1.0)))
-    raise ValueError(f"Unsupported correlation metric: {metric}")
-
-
-def summarize_correlation_matrix(matrix: np.ndarray) -> dict[str, float]:
+def summarize_cosine_similarity_matrix(matrix: np.ndarray) -> dict[str, float]:
     mask = ~np.eye(matrix.shape[0], dtype=bool)
     off_diag = matrix[mask]
     abs_off_diag = np.abs(off_diag)
@@ -87,3 +77,7 @@ def summarize_correlation_matrix(matrix: np.ndarray) -> dict[str, float]:
         "min_offdiag": float(off_diag.min()),
         "max_offdiag": float(off_diag.max()),
     }
+
+
+def compute_condition_number(endmembers: np.ndarray) -> float:
+    return float(np.linalg.cond(endmembers))

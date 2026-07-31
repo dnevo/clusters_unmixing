@@ -33,11 +33,11 @@ The project runs configured *experiment batches*. Each batch:
   (optionally with a tunable nonlinear mixing term and additive sensor noise);
 - applies wavelength-range selection and optional normalization at each preprocessing
   "stage";
-- computes endmember-separability correlation metrics (cosine similarity, spectral angle)
-  at every stage, independent of any unmixing model;
+- computes endmember-separability cosine similarity metrics at every stage,
+  independent of any unmixing model;
 - evaluates every registered unmixing model (classical solvers and neural networks) on
   the same synthetic pixels, scored on a shared held-out test split;
-- writes summary CSVs for correlation, per-model metrics, and abundance previews;
+- writes summary CSVs for cosine similarity, per-model metrics, and abundance previews;
 - supports notebook-based review of the same outputs (spectra, metrics, abundance
   tables, synthetic pixel previews).
 
@@ -80,7 +80,7 @@ groups with 85.5% accuracy overall, but **clusters 3, 4, and 5 are only weakly s
 spectrally** — the paper's own analysis found their mean reflectance spectra close
 together, differing mainly in near/mid-infrared brightness. This is the direct
 motivation for the empirical band-selection comment in `configuration.yaml` (a
-narrower, cosine-correlation-optimized band selection actually performed *worse* than
+narrower, cosine-similarity-optimized band selection actually performed *worse* than
 using nearly the full spectrum — endmember collinearity here is a real, hard problem,
 not an artifact of a bad wavelength choice).
 
@@ -124,7 +124,7 @@ src/clusters_unmixing/
   config/schema.py                       pydantic experiment configuration + validation
   dataio.py                              cluster CSV loading (wavelength axis + endmember matrix)
   data/synthetic.py                      synthetic abundance vector generation
-  core_math.py                           correlation metrics, SNR noise, GBM mixing (mix_pixels)
+  core_math.py                           cosine similarity metrics, SNR noise, GBM mixing (mix_pixels)
   preprocessing/band_selection.py        wavelength-range selection
   preprocessing/normalization.py         quadratic-baseline normalization
   pipelines/experiment_pipeline.py       orchestrates a full experiment batch (run_experiments)
@@ -162,11 +162,11 @@ For each configured run in `runs`:
    raw endmembers: select wavelength ranges (`preprocessing.band_selection`), then apply
    normalization (`preprocessing.normalization`). Each stage's `(endmembers, pixels)` pair
    is kept for later comparison.
-7. **Assess endmember separability per stage.** For each configured metric (`cosine`,
-   `sam`) and each stage, `core_math.compute_correlation_matrix` /
-   `summarize_correlation_matrix` report how collinear the endmembers are — this is
-   independent of any unmixing model and is exactly what surfaces the
-   cluster-3/4/5 collinearity problem described above.
+7. **Assess endmember separability per stage.** For each stage,
+   `core_math.compute_cosine_similarity_matrix` / `summarize_cosine_similarity_matrix`
+   report how collinear the endmembers are (cosine similarity) — this is independent of
+   any unmixing model and is exactly what surfaces the cluster-3/4/5 collinearity
+   problem described above.
 8. **Pick a shared held-out test split.** `_make_held_out_test_indices` reserves ~10% of
    pixels; the same indices are used to score every model in the run, so supervised NN
    models (trained on ~90% of the pixels) aren't compared unfairly against iterative
@@ -176,7 +176,7 @@ For each configured run in `runs`:
 10. **Score and log.** `abundance_rmse` and `reconstruction_rmse` are computed on the
     held-out test pixels for every model; a handful of preview pixels are logged with
     their true and per-model estimated abundances for notebook review.
-11. **Write outputs**: `correlation_summary.csv`, `model_summary.csv`,
+11. **Write outputs**: `cosine_similarity_summary.csv`, `model_summary.csv`,
     `abundance_preview.csv` under `experiments/outputs/{experiment_name}/`.
 
 ## Synthetic data generation
@@ -279,8 +279,6 @@ fairly (they never "trained" on any of it), unlike the supervised NN models.
 
 - `experiment_name` — output folder name under `experiments/outputs/`.
 - `cluster_sets` — list of `{name, path}` cluster CSVs available to runs.
-- `metrics` — required non-empty list of correlation metrics (`cosine`, `sam`) computed
-  on endmembers at every preprocessing stage.
 - `models` — per-model-name hyperparameters (validated per-model where a stronger
   schema exists, e.g. `small_mlp`'s `SmallMLPParamsModel`; otherwise passed through as
   a dict to that model's own `dataclass` config).
@@ -313,8 +311,9 @@ root.
 
 Each run batch writes results under `experiments/outputs/{experiment_name}/`:
 
-- `correlation_summary.csv` — per-run, per-metric, per-stage endmember separability
-  statistics (`mean_abs_offdiag`, `max_abs_offdiag`, `min_offdiag`, `max_offdiag`).
+- `cosine_similarity_summary.csv` — per-run, per-stage endmember separability
+  statistics (`condition_number`, `mean_abs_offdiag`, `max_abs_offdiag`, `min_offdiag`,
+  `max_offdiag`).
 - `model_summary.csv` — one row per run and metric (`abundance_rmse`,
   `reconstruction_rmse`), one column per configured model, computed on the shared
   held-out test pixels.

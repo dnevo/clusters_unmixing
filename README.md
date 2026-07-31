@@ -30,7 +30,7 @@ The default experiment configuration lives in `experiments/configs/configuration
 - `dataio.py`: cluster CSV loading
 - `preprocessing/band_selection.py`: wavelength selection
 - `preprocessing/normalization.py`: normalization helpers
-- `core_math.py`: correlation metric computation, SNR noise application, and shared numeric helpers
+- `core_math.py`: cosine similarity computation, SNR noise application, and shared numeric helpers
 - `pipelines/experiment_pipeline.py`: experiment execution pipeline exposed as `run_experiments`
 - `utils/notebook_diagnostics.py`: notebook orchestration, tables, and plotting helpers
 - `models/runner_registry.py`: model registry and dispatch
@@ -78,7 +78,6 @@ Key sections in the config:
 - `extra_reproducibility`: opt-in bit-exact CUDA determinism (performance cost; auto-skipped for runs including `mamba`)
 - `use_wandb`: opt-in Weights & Biases logging - one run per model call plus a batch summary run with the output CSVs as an artifact; requires `pip install -e .[wandb]` and a logged-in wandb account
 - `cluster_sets`: available input cluster CSV files
-- `metrics`: required non-empty list of correlation metrics to compute for projected endmembers (`cosine`, `sam`)
 - `models`: model hyperparameters keyed by model name
 - `runs`: concrete experiment runs including bands, normalization, noise level, pixel count, and selected models
 
@@ -88,13 +87,13 @@ Relative paths in the config are resolved from the supplied project root.
 
 Each run batch writes results under:
 
-- `experiments/outputs/{experiment_name}/correlation_summary.csv`
+- `experiments/outputs/{experiment_name}/cosine_similarity_summary.csv`
 - `experiments/outputs/{experiment_name}/model_summary.csv`
 - `experiments/outputs/{experiment_name}/abundance_preview.csv`
 
 At a high level:
 
-- `correlation_summary.csv` stores per-run, per-metric, per-stage correlation statistics (`raw`, `normalized`)
+- `cosine_similarity_summary.csv` stores per-run, per-stage cosine similarity statistics (`raw`, `normalized`)
 - `model_summary.csv` stores one row per run and metric, with one column per configured model
 - `abundance_preview.csv` stores the notebook-ready abundance preview table with `pixel_index`, `source`, error columns, and `endmember_*` values
 
