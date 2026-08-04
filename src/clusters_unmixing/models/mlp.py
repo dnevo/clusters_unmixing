@@ -10,8 +10,8 @@ from .base_nn import BaseNNUnmixing, TrainingConfig
 
 
 @dataclass(slots=True)
-class SmallMLPConfig(TrainingConfig):
-    """Configuration for the small supervised MLP unmixing model."""
+class MLPConfig(TrainingConfig):
+    """Configuration for the supervised MLP unmixing model."""
 
     hidden_dim_1: int = 64
     hidden_dim_2: int = 32
@@ -31,10 +31,10 @@ class _AbundanceMLP(nn.Module):
         return F.softmax(logits, dim=-1)
 
 
-class SmallMLPUnmixing(BaseNNUnmixing):
-    """Small neural unmixing model (3-layer MLP with softmax abundances)."""
+class MLPUnmixing(BaseNNUnmixing):
+    """Neural unmixing model (3-layer MLP with softmax abundances)."""
 
-    cfg: SmallMLPConfig
+    cfg: MLPConfig
 
     def _build_model(self, in_dim: int, out_dim: int) -> nn.Module:
         return _AbundanceMLP(

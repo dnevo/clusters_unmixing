@@ -194,6 +194,8 @@ def run_experiments_notebook(project_root: Path) -> None:
         cluster_set = run_cfg.cluster_set
         bands_ranges = run_cfg.normalized_bands_ranges()
         normalization = run_cfg.normalization
+        abundance_distribution = run_cfg.abundance_distribution
+        dirichlet_alpha = run_cfg.dirichlet_alpha
         snr_db = run_cfg.snr_db
 
         bands_label = ", ".join(
@@ -213,6 +215,8 @@ def run_experiments_notebook(project_root: Path) -> None:
                     cluster_set,
                     bands_label,
                     normalization,
+                    abundance_distribution,
+                    dirichlet_alpha,
                     run_cfg.num_pixels,
                     f'{snr_db:g} dB' if np.isfinite(snr_db) else 'inf',
                     ', '.join(run_cfg.effective_model_names()),
@@ -223,6 +227,8 @@ def run_experiments_notebook(project_root: Path) -> None:
                 'cluster set',
                 'bands',
                 'normalization',
+                'abundance distribution',
+                'Dirichlet alpha',
                 'pixels',
                 'snr',
                 'models',

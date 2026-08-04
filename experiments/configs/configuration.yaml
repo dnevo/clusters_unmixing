@@ -69,7 +69,7 @@ models:
       check_every: 10
       verbose: true
 
-  - name: small_mlp
+  - name: mlp
     params:
       hidden_dim_1: 64
       hidden_dim_2: 32
@@ -137,6 +137,12 @@ runs:
 
     normalization: quadratic   # options: none | quadratic
 
+    # Synthetic abundance generator. "grid" preserves the legacy sparse,
+    # discrete 0.04-step generator. "dirichlet" draws continuous abundances
+    # for all endmembers; alpha < 1 makes mixtures more sparse-looking.
+    abundance_distribution: dirichlet   # options: grid | dirichlet
+    dirichlet_alpha: 0.3           # used when abundance_distribution=dirichlet
+
     num_pixels: 10000 # number of synthetic pixels generated
 
     # signal-to-noise ratio in dB; higher = less noise. Use .inf for zero noise
@@ -159,7 +165,7 @@ runs:
       - vpgdu
       - mlm
       - gbm
-      - small_mlp
+      - mlp
       - kan
       - mamba
 

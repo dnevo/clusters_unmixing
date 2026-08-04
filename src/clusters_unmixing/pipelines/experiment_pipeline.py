@@ -52,6 +52,8 @@ def _planned_model_runs(exp: ExperimentConfig) -> list[dict[str, Any]]:
             "cluster_set": item.cluster_set,
             "bands_ranges": item.normalized_bands_ranges(),
             "normalization": item.normalization,
+            "abundance_distribution": item.abundance_distribution,
+            "dirichlet_alpha": item.dirichlet_alpha,
             "num_pixels": item.num_pixels,
             "snr_db": item.snr_db,
             "nonlinearity_gamma": item.nonlinearity_gamma,
@@ -159,7 +161,7 @@ def _make_held_out_test_indices(n_pixels: int, test_fraction: float = 0.1) -> np
     """Pick one held-out pixel subset per run, shared by every model.
 
     Iterative solvers (sunsal/vpgdu) never see labels, so scoring them on all
-    pixels is fine; but small_mlp/convnext1d train on ~90% of the same pixels,
+    pixels is fine; but mlp/convnext1d train on ~90% of the same pixels,
     so scoring everyone on all pixels would let those two "cheat" on the
     reported metric. Using the same held-out subset for every model keeps the
     comparison apples-to-apples.
@@ -173,18 +175,23 @@ def _make_synthetic_pixels(
     num_pixels: int,
     snr_db: float,
     nonlinearity_gamma: float = 0.0,
+    abundance_distribution: str = "grid",
+    dirichlet_alpha: float = 0.3,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Generate synthetic abundances and their resulting noisy pixel spectra.
 
-    Pixels are synthesized from abundances via the Generalized Bilinear Model
-    (see ``core_math.mix_pixels``); ``nonlinearity_gamma=0.0`` keeps the standard
-    linear mixing model. Additive noise is then applied at the requested SNR.
+    Pixels are synthesized from the configured abundance distribution and then
+    mixed via the Generalized Bilinear Model (see ``core_math.mix_pixels``);
+    ``nonlinearity_gamma=0.0`` keeps the standard linear mixing model. Additive
+    noise is then applied at the requested SNR.
     """
     n_endmembers = endmembers.shape[0]
     abundances = generate_samples(
         num_samples=num_pixels,
         max_non_zero_endmembers=n_endmembers,
         num_endmembers=n_endmembers,
+        abundance_distribution=abundance_distribution,
+        dirichlet_alpha=dirichlet_alpha,
     )
     clean_pixels = mix_pixels(abundances, endmembers, nonlinearity_gamma)
     noisy_pixels, _ = apply_snr_noise(clean_pixels, snr_db)
@@ -241,6 +248,8 @@ def run_experiments(exp: ExperimentConfig) -> dict[str, Any]:
             run["num_pixels"],
             run["snr_db"],
             run["nonlinearity_gamma"],
+            run["abundance_distribution"],
+            run["dirichlet_alpha"],
         )
 
         stage_projections = _build_stage_projections(
@@ -292,7 +301,7 @@ def run_experiments(exp: ExperimentConfig) -> dict[str, Any]:
             )
             # Score every model on the same held-out pixels (see
             # _make_held_out_test_indices) rather than the full pixel set, so
-            # models that trained on some of these pixels (small_mlp,
+            # models that trained on some of these pixels (mlp,
             # convnext1d) aren't compared unfairly against ones that didn't
             # (sunsal, vpgdu).
             test_abundances_pred = abundances[test_indices]
@@ -348,6 +357,8 @@ def run_experiments(exp: ExperimentConfig) -> dict[str, Any]:
                         'run_overrides': run['run_overrides'],
                         'cluster_set': run['cluster_set'],
                         'normalization': run['normalization'],
+                        'abundance_distribution': run['abundance_distribution'],
+                        'dirichlet_alpha': run['dirichlet_alpha'],
                         'num_pixels': run['num_pixels'],
                         'snr_db': run['snr_db'],
                         'nonlinearity_gamma': run['nonlinearity_gamma'],

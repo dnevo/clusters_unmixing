@@ -4,6 +4,9 @@ import random
 
 import numpy as np
 
+
+ABUNDANCE_DISTRIBUTIONS = {"grid", "dirichlet"}
+
 def _generate_split_fractions(k: int, num_fractions_base: int) -> list[float]:
     """Generates k positive fractions that sum to 1.0, with each being a multiple of 1/num_fractions_base."""
     if k == 1:
@@ -22,18 +25,46 @@ def _generate_split_fractions(k: int, num_fractions_base: int) -> list[float]:
     return [p / float(num_fractions_base) for p in parts]
 
 
-def generate_samples(num_samples: int, max_non_zero_endmembers: int, num_endmembers: int = 6) -> np.ndarray:
+def generate_samples(
+    num_samples: int,
+    max_non_zero_endmembers: int,
+    num_endmembers: int = 6,
+    abundance_distribution: str = "grid",
+    dirichlet_alpha: float = 0.3,
+) -> np.ndarray:
     """Generate synthetic abundance vectors.
 
-    Behavior matches the legacy project:
+    ``abundance_distribution="grid"`` matches the legacy project:
     - include pure endmembers first
     - each sample has at most ``max_non_zero_endmembers`` active components
     - abundances sum to 1.0
     - non-zero abundances are multiples of 0.04 (1/25)
 
+    ``abundance_distribution="dirichlet"`` draws every sample directly from
+    a symmetric Dirichlet distribution over all endmembers. Values of
+    ``dirichlet_alpha`` below 1 produce sparse-looking mixtures, 1 is uniform
+    over the continuous simplex, and values above 1 produce more balanced
+    mixtures. Dirichlet samples do not contain exact zeros and pure samples
+    are not inserted automatically.
+
     Randomness is intentionally driven by Python's ``random`` module so callers can
-    reproduce the legacy results by resetting ``random.seed(...)`` before calling.
+    reproduce grid results by resetting ``random.seed(...)`` before calling.
+    Dirichlet results use NumPy's RNG and are reproducible via ``np.random.seed``.
     """
+    distribution = str(abundance_distribution).strip().lower()
+    if distribution not in ABUNDANCE_DISTRIBUTIONS:
+        raise ValueError(
+            f"abundance_distribution must be one of: {sorted(ABUNDANCE_DISTRIBUTIONS)}"
+        )
+    if isinstance(dirichlet_alpha, bool) or not isinstance(dirichlet_alpha, (int, float)):
+        raise ValueError("dirichlet_alpha must be a positive number")
+    if float(dirichlet_alpha) <= 0.0:
+        raise ValueError("dirichlet_alpha must be > 0")
+
+    if distribution == "dirichlet":
+        concentration = np.full(num_endmembers, float(dirichlet_alpha), dtype=np.float64)
+        return np.random.dirichlet(concentration, size=num_samples).astype(np.float32)
+
     unique_generated_samples: set[tuple] = set()
     # The denominator for fraction granularity, currently set to 25 for 0.04 increments
     # total distinct combinations: math.comb(25-1, 6-1) = 42,504 

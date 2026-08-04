@@ -34,7 +34,7 @@ The default experiment configuration lives in `experiments/configs/configuration
 - `pipelines/experiment_pipeline.py`: experiment execution pipeline exposed as `run_experiments`
 - `utils/notebook_diagnostics.py`: notebook orchestration, tables, and plotting helpers
 - `models/runner_registry.py`: model registry and dispatch
-- `models/sunsal.py`, `models/vpgdu.py`, `models/mlm.py`, `models/small_mlp.py`, `models/convnext1d.py`, `models/kan.py`, `models/mamba.py`: unmixing model implementations
+- `models/sunsal.py`, `models/vpgdu.py`, `models/mlm.py`, `models/mlp.py`, `models/convnext1d.py`, `models/kan.py`, `models/mamba.py`: unmixing model implementations
 
 ## Run the project
 
@@ -79,7 +79,23 @@ Key sections in the config:
 - `use_wandb`: opt-in Weights & Biases logging - one run per model call plus a batch summary run with the output CSVs as an artifact; requires `pip install -e .[wandb]` and a logged-in wandb account
 - `cluster_sets`: available input cluster CSV files
 - `models`: model hyperparameters keyed by model name
-- `runs`: concrete experiment runs including bands, normalization, noise level, pixel count, and selected models
+- `runs`: concrete experiment runs including bands, normalization, abundance distribution,
+  noise level, pixel count, and selected models
+
+Synthetic abundances are configured per run with:
+
+```yaml
+abundance_distribution: grid       # grid | dirichlet
+dirichlet_alpha: 0.3               # used for dirichlet
+```
+
+`grid` is the legacy sparse generator: it selects active endmembers and assigns
+abundances in discrete 0.04 increments, including pure endmembers. `dirichlet`
+draws continuous abundances for all endmembers. Its `dirichlet_alpha` controls
+the shape: values below 1 produce sparse-looking mixtures, 1 is uniform over
+the continuous simplex, and values above 1 favor more balanced mixtures.
+Dirichlet samples do not contain exact zeros or automatically inserted pure
+pixels.
 
 Relative paths in the config are resolved from the supplied project root.
 

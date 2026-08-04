@@ -12,7 +12,14 @@ BandRangeSpec = tuple[float, float, str]
 # Run-level fields eligible for sweep_params. Deliberately excludes cluster_set and
 # bands_ranges (both change array shapes downstream) and name/models/sweep_params
 # (structural, not data).
-SWEEPABLE_RUN_PARAMS = {"num_pixels", "snr_db", "nonlinearity_gamma", "normalization"}
+SWEEPABLE_RUN_PARAMS = {
+    "num_pixels",
+    "snr_db",
+    "nonlinearity_gamma",
+    "normalization",
+    "abundance_distribution",
+    "dirichlet_alpha",
+}
 
 
 def _validate_sweep_value_list(owner: str, key: str, values: Any) -> list[Any]:
@@ -28,7 +35,7 @@ def _validate_sweep_value_list(owner: str, key: str, values: Any) -> list[Any]:
     return values
 
 
-class SmallMLPParamsModel(BaseModel):
+class MLPParamsModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
     hidden_dim_1: int = Field(64, ge=1)
     hidden_dim_2: int = Field(32, ge=1)
@@ -76,8 +83,8 @@ class ModelSpecConfig(BaseModel):
         valid_models = known_model_names()
         if name not in valid_models:
             raise ValueError(f"Unsupported model '{self.name}'. Registered models: {sorted(valid_models)}")
-        if name == "small_mlp":
-            self.params = SmallMLPParamsModel.model_validate(self.params).model_dump()
+        if name == "mlp":
+            self.params = MLPParamsModel.model_validate(self.params).model_dump()
         return self
 
     def normalized_name(self) -> str:
@@ -160,6 +167,16 @@ class ModelRunConfig(BaseModel):
     cluster_set: str
     bands_ranges: list[Any]
     normalization: str = "none"
+    abundance_distribution: str = "grid"
+    dirichlet_alpha: float = Field(
+        0.3,
+        gt=0,
+        description=(
+            "Symmetric Dirichlet concentration parameter used when abundance_distribution "
+            "is 'dirichlet'. Values below 1 produce sparse-looking mixtures; 1 is uniform "
+            "over the continuous simplex; values above 1 favor balanced mixtures."
+        ),
+    )
     models: list[ModelSelectionEntry]
     sweep_params: dict[str, list[Any]] = Field(default_factory=dict)
     num_pixels: int
@@ -209,6 +226,23 @@ class ModelRunConfig(BaseModel):
         if normalized not in {"none", "quadratic"}:
             raise ValueError("Model run 'normalization' must be one of: none, quadratic")
         return normalized
+
+    @field_validator("abundance_distribution")
+    @classmethod
+    def _validate_abundance_distribution(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if normalized not in {"grid", "dirichlet"}:
+            raise ValueError("Model run 'abundance_distribution' must be one of: grid, dirichlet")
+        return normalized
+
+    @field_validator("dirichlet_alpha")
+    @classmethod
+    def _validate_dirichlet_alpha(cls, value: float) -> float:
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise ValueError("Model run 'dirichlet_alpha' must be a positive number")
+        if not math.isfinite(float(value)) or float(value) <= 0.0:
+            raise ValueError("Model run 'dirichlet_alpha' must be finite and > 0")
+        return float(value)
 
     @field_validator("snr_db")
     @classmethod

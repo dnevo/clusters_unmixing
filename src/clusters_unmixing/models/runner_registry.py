@@ -5,7 +5,7 @@ from typing import Any, Callable
 import numpy as np
 import torch
 
-from .small_mlp import SmallMLPConfig, SmallMLPUnmixing
+from .mlp import MLPConfig, MLPUnmixing
 from .convnext1d import ConvNeXt1DConfig, ConvNeXt1DUnmixing
 from .kan import KANConfig, KANUnmixing
 from .gbm import GBM, GBMConfig
@@ -59,9 +59,9 @@ def _run_gbm(endmembers: torch.Tensor, pixels: torch.Tensor, true_abundances: to
     }
 
 
-def _run_small_mlp(endmembers: torch.Tensor, pixels: torch.Tensor, true_abundances: torch.Tensor, params: dict[str, Any], test_indices: torch.Tensor | None, run_label: str | None) -> tuple[torch.Tensor, dict[str, Any]]:
-    solver = SmallMLPUnmixing(
-        SmallMLPConfig(**params),
+def _run_mlp(endmembers: torch.Tensor, pixels: torch.Tensor, true_abundances: torch.Tensor, params: dict[str, Any], test_indices: torch.Tensor | None, run_label: str | None) -> tuple[torch.Tensor, dict[str, Any]]:
+    solver = MLPUnmixing(
+        MLPConfig(**params),
         in_dim=int(pixels.shape[1]),
         out_dim=int(endmembers.shape[0]),
     )
@@ -116,7 +116,7 @@ def _run_kan(endmembers: torch.Tensor, pixels: torch.Tensor, true_abundances: to
 
 
 _MODEL_REGISTRY: dict[str, ModelRunner] = {
-    "sunsal": _run_sunsal, "vpgdu": _run_vpgdu, "mlm": _run_mlm, "gbm": _run_gbm, "small_mlp": _run_small_mlp, "convnext1d": _run_convnext1d, "kan": _run_kan}
+    "sunsal": _run_sunsal, "vpgdu": _run_vpgdu, "mlm": _run_mlm, "gbm": _run_gbm, "mlp": _run_mlp, "convnext1d": _run_convnext1d, "kan": _run_kan}
 
 # Mamba requires the GPU-only mamba-ssm package (see pyproject.toml's "mamba"
 # extra); importing it is deferred and guarded so that its absence - the
@@ -157,7 +157,7 @@ def available_models() -> list[str]:
 # referencing "mamba" fails to even load on a machine without mamba-ssm,
 # instead of only failing when that specific model is actually invoked.
 KNOWN_MODEL_NAMES: frozenset[str] = frozenset(
-    {"sunsal", "vpgdu", "mlm", "gbm", "small_mlp", "convnext1d", "kan", "mamba"}
+    {"sunsal", "vpgdu", "mlm", "gbm", "mlp", "convnext1d", "kan", "mamba"}
 )
 
 
