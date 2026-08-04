@@ -156,14 +156,14 @@ runs:
 
     models:
       - sunsal
-      #- vpgdu
-      #- mlm
-      #- gbm
-      #- small_mlp
+      - vpgdu
+      - mlm
+      - gbm
+      - small_mlp
       - kan
-      #- mamba
+      - mamba
 
     sweep_params:
-      snr_db: [30.0, .inf]   # must be ".inf", not "inf" - see note above
+      snr_db: [20.0, 30.0, .inf]   # must be ".inf", not "inf" - see note above
       normalization: [none, quadratic]
       nonlinearity_gamma: [0.0, 0.25]
