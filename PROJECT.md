@@ -134,7 +134,7 @@ src/clusters_unmixing/
     vpgdu.py                             VPGDU (vectorized projected gradient descent)
     mlm.py                               Multilinear Mixing Model (nonlinearity-aware comparison)
     base_nn.py                           shared supervised-NN training scaffolding
-    small_mlp.py, convnext1d.py, kan.py, mamba.py   supervised NN unmixing models
+    mlp.py, convnext1d.py, kan.py, mamba.py         supervised NN unmixing models
   utils/notebook_diagnostics.py          notebook orchestration, tables, plotting helpers
 ```
 
@@ -152,7 +152,8 @@ For each configured run in `runs`:
 2. **Seed globally** (`random`, `numpy`, `torch` all seeded to `0`) so the same run
    config always regenerates the same synthetic pixels.
 3. **Generate synthetic abundances.** `data.synthetic.generate_samples` produces
-   `num_pixels` abundance vectors on the probability simplex (see below).
+   `num_pixels` abundance vectors on the probability simplex using the configured
+   `abundance_distribution` (`grid` or `dirichlet`) and `dirichlet_alpha` (see below).
 4. **Mix into pixel spectra.** `core_math.mix_pixels(abundances, endmembers,
    nonlinearity_gamma)` combines abundances and endmembers — linear mixing at
    `nonlinearity_gamma=0.0`, with an optional bilinear (GBM) nonlinear term otherwise.
@@ -182,16 +183,17 @@ For each configured run in `runs`:
 ## Synthetic data generation
 
 `data/synthetic.py::generate_samples(num_samples, max_non_zero_endmembers,
-num_endmembers=6)`:
+num_endmembers=6, abundance_distribution="grid", dirichlet_alpha=0.3)` supports two
+abundance distributions. The default `grid` distribution keeps the legacy behavior:
 
 - Always includes the `num_endmembers` pure endmember vectors first (one-hot).
 - For every remaining sample: picks a sparsity level `k` uniformly in
   `[1, max_non_zero_endmembers]`, picks `k` active endmember indices uniformly at
   random from all `C(n, k)` combinations, then splits `1.0` among them using a
-  stick-breaking construction (`k-1` random cut points among 50 discrete units) — this
+  stick-breaking construction (`k-1` random cut points among 25 discrete units) — this
   is the textbook-correct way to sample uniformly on a discrete simplex, not a naive
   "normalize k uniforms" approach that would bias toward the centroid.
-- Non-zero abundances are therefore multiples of `1/50 = 0.02`.
+- Non-zero abundances are therefore multiples of `1/25 = 0.04`.
 - Randomness is driven by Python's `random` module (not `numpy.random`), so results are
   reproducible by seeding `random.seed(...)` before calling — which is exactly what
   `_set_global_seeds` does in the pipeline.
@@ -203,6 +205,14 @@ trade-off: it's an even, unbiased stress test across mixing complexity, at the c
 not reflecting the gradient-adjacency structure described in the domain section above. A
 gradient-adjacency-biased variant was prototyped and explicitly rejected as too complex
 for the value it added; the generator remains intentionally simple.
+
+The alternative `abundance_distribution: dirichlet` draws continuous abundance vectors
+across all endmembers. `dirichlet_alpha` controls the concentration: values below 1
+produce sparse-looking, uneven mixtures; 1 is uniform over the continuous simplex; and
+values above 1 favor balanced mixtures. The recommended starting value is `0.3`.
+Unlike the grid distribution, ordinary Dirichlet draws have no exact zeros and pure
+endmember vectors are not inserted automatically. The pipeline seeds NumPy's random
+number generator so Dirichlet runs remain reproducible.
 
 ## Mixing models: linear vs. nonlinear
 
@@ -256,7 +266,7 @@ when testing MLM against other bilinear models' synthetic data.
 | `sunsal` | Classical, iterative | Unsupervised (no labels used) | ADMM solver for constrained sparse regression under ANC + ASC | Bioucas-Dias & Figueiredo (2010), IEEE JSTSP |
 | `vpgdu` | Classical, iterative | Unsupervised | SAM-based initial estimate + vectorized projected gradient descent onto the simplex (Chen & Ye projection) | Kizel et al., "A Stepwise Analytical Projected Gradient Descent Search for Hyperspectral Unmixing..." |
 | `mlm` | Classical, alternating fit | Unsupervised | Estimates abundances *and* a single global nonlinearity parameter `P` (Multilinear Mixing Model); internally alternates a grid search over `P` with re-fitting abundances via SunSAL on a transformed target | Heylen & Scheunders (2016), IEEE TGRS |
-| `small_mlp` | Neural network | Supervised | 3-layer MLP, softmax output for simplex-constrained abundances | — |
+| `mlp` | Neural network | Supervised | 3-layer MLP, softmax output for simplex-constrained abundances | — |
 | `convnext1d` | Neural network | Supervised | ConvNeXt-style 1D convolutional blocks over the spectrum, softmax abundances | — |
 | `kan` | Neural network | Supervised | Kolmogorov-Arnold Network: per-edge base activation + learned B-spline, softmax abundances | — |
 | `mamba` | Neural network | Supervised | Selective state-space model (Mamba) over patchified spectra; GPU-only, requires the optional `mamba-ssm` package (`pyproject.toml`'s `mamba` extra) | — |
@@ -280,7 +290,7 @@ fairly (they never "trained" on any of it), unlike the supervised NN models.
 - `experiment_name` — output folder name under `experiments/outputs/`.
 - `cluster_sets` — list of `{name, path}` cluster CSVs available to runs.
 - `models` — per-model-name hyperparameters (validated per-model where a stronger
-  schema exists, e.g. `small_mlp`'s `SmallMLPParamsModel`; otherwise passed through as
+  schema exists, e.g. `mlp`'s `MLPParamsModel`; otherwise passed through as
   a dict to that model's own `dataclass` config).
 - `runs` — one or more concrete runs, each specifying:
   - `cluster_set` — which entry in `cluster_sets` to use.
