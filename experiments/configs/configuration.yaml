@@ -153,9 +153,10 @@ runs:
     # np.isinf() with a confusing TypeError.
     snr_db: 30.0
 
-    # Generalized Bilinear Model nonlinearity strength in [0, 1] applied when
-    # synthesizing pixels: 0.0 = standard linear mixing, 1.0 = Fan model
-    # (full pairwise multiple-scattering interaction between endmembers).
+    # Generalized Bilinear Model nonlinearity upper bound in [0, 1] applied when
+    # synthesizing pixels: 0.0 = standard linear mixing; for values > 0, each
+    # endmember pair gets its own coefficient gamma_ij drawn independently from
+    # Uniform(0, nonlinearity_gamma) (see core_math.mix_pixels).
     # For 6clusters_thomas (chemically graded soil, not distinct materials), treat
     # this as a numerical robustness knob rather than a physical simulation.
     nonlinearity_gamma: 0.25
@@ -163,11 +164,11 @@ runs:
     models:
       - sunsal
       - vpgdu
-      - mlm
+      #- mlm
       - gbm
       - mlp
       - kan
-      - mamba
+      #- mamba
 
     sweep_params:
       snr_db: [20.0, 30.0, .inf]   # must be ".inf", not "inf" - see note above

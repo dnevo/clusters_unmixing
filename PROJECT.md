@@ -219,17 +219,21 @@ number generator so Dirichlet runs remain reproducible.
 **Linear Mixing Model (LMM)** — the default (`nonlinearity_gamma=0.0`): pixel spectrum is
 exactly `abundances @ endmembers`.
 
-**Generalized Bilinear Model / Fan model (GBM)** — `core_math.mix_pixels`:
+**Generalized Bilinear Model (GBM)** — `core_math.mix_pixels`:
 
 ```
-pixel = sum_i a_i * m_i  +  gamma * sum_{i<j} a_i * a_j * (m_i ⊙ m_j)
+pixel = sum_i a_i * m_i  +  sum_{i<j} gamma_ij * a_i * a_j * (m_i ⊙ m_j)
 ```
 
-`gamma=0` recovers the LMM exactly; `gamma=1` is the Fan model (no free parameter per
-endmember pair, full pairwise interaction). This models the classic bilinear/GBM story
-of light bouncing once between two different materials before reaching the sensor. It's
-wired into `runs[*].nonlinearity_gamma` in `configuration.yaml`, so any run can be swept
-from purely linear to strongly nonlinear.
+`gamma=0` recovers the LMM exactly (no coefficients are drawn). For `gamma > 0`, each
+endmember pair's own coefficient `gamma_ij` is drawn independently from
+`Uniform(0, gamma)`, once per call and shared across every pixel — it represents a fixed
+property of that endmember pair, not something that varies pixel to pixel. `gamma=1`
+is the upper bound at which a pair's coefficient can reach the full Fan-model strength
+(no free parameter, full pairwise interaction), but individual draws are typically
+smaller. This models the classic bilinear/GBM story of light bouncing once between two
+different materials before reaching the sensor. It's wired into `runs[*].nonlinearity_gamma`
+in `configuration.yaml`, so any run can be swept from purely linear to strongly nonlinear.
 
 As noted in the domain section, this project's specific cluster set (chemically graded
 variants of one soil, not optically distinct materials) doesn't have strong physical
@@ -302,8 +306,9 @@ fairly (they never "trained" on any of it), unlike the supervised NN models.
   - `snr_db` — signal-to-noise ratio in dB for additive Gaussian noise; higher means
     less noise. Use `inf` for zero noise (noiseless pixels) - infinite SNR is the
     mathematical way of saying "no noise".
-  - `nonlinearity_gamma` — GBM nonlinearity strength in `[0, 1]` (default `0.0`, i.e.
-    pure linear mixing).
+  - `nonlinearity_gamma` — GBM nonlinearity upper bound in `[0, 1]` (default `0.0`, i.e.
+    pure linear mixing); for values `> 0`, each endmember pair's coefficient is drawn
+    independently from `Uniform(0, nonlinearity_gamma)` (see "Mixing models" above).
   - `models` — which registered model names to run for this configuration. Each entry
     is either a bare name (runs once using its unchanged defaults from the top-level
     `models` catalog above) or a single-key mapping `name: {param: [values]}` sweeping

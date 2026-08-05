@@ -184,10 +184,11 @@ class ModelRunConfig(BaseModel):
     nonlinearity_gamma: float = Field(
         0.0,
         description=(
-            "Generalized Bilinear Model (GBM) nonlinearity strength in [0, 1] used when "
+            "Generalized Bilinear Model (GBM) nonlinearity upper bound in [0, 1] used when "
             "synthesizing pixels from abundances and endmembers. 0.0 keeps the standard "
-            "linear mixing model; 1.0 is the Fan model (full pairwise multiple-scattering "
-            "interaction between endmembers). For chemically graded cluster sets (e.g. "
+            "linear mixing model; for values > 0, each endmember pair's own nonlinear "
+            "coefficient gamma_ij is drawn independently from Uniform(0, nonlinearity_gamma) "
+            "(see core_math.mix_pixels). For chemically graded cluster sets (e.g. "
             "6clusters_thomas), this is a numerical robustness knob, not a physical model "
             "of distinct materials interacting."
         ),

@@ -11,33 +11,39 @@ def mix_pixels(abundances: np.ndarray, endmembers: np.ndarray, gamma: float = 0.
     """Combine abundances and endmembers into pixel spectra under the Generalized Bilinear Model.
 
     ``gamma=0.0`` is the standard linear mixing model (``abundances @ endmembers``).
-    ``gamma=1.0`` is the Fan model: every pair of endmembers ``(i, j)`` contributes an
-    extra ``a_i * a_j * (m_i ⊙ m_j)`` term (elementwise product of the two endmember
-    spectra), approximating the multiple-scattering ("double bounce") interaction between
-    two distinct materials touching at sub-pixel scale. Values in between interpolate
-    linearly between the two regimes. For chemically graded soil cluster sets (e.g.
-    6clusters_thomas), treat gamma as a numerical robustness knob rather than a physically
-    motivated simulation, since the endmembers aren't optically distinct materials.
+    For ``gamma > 0``, every pair of endmembers ``(i, j)`` contributes an extra
+    ``gamma_ij * a_i * a_j * (m_i ⊙ m_j)`` term (elementwise product of the two
+    endmember spectra), approximating the multiple-scattering ("double bounce")
+    interaction between two distinct materials touching at sub-pixel scale. Each
+    pair's coefficient ``gamma_ij`` is drawn independently from ``Uniform(0, gamma)``,
+    once per call and shared across every pixel - it represents a fixed property of
+    that endmember pair, not something that varies pixel to pixel. For chemically
+    graded soil cluster sets (e.g. 6clusters_thomas), treat gamma as a numerical
+    robustness knob rather than a physically motivated simulation, since the
+    endmembers aren't optically distinct materials.
 
     Parameters
     ----------
     abundances : (n_pixels, n_endmembers)
     endmembers : (n_endmembers, n_bands)
-    gamma : nonlinearity strength in [0, 1].
+    gamma : upper bound in [0, 1] for the per-pair ``Uniform(0, gamma)`` coefficients;
+        0.0 disables the nonlinear term entirely.
     """
     linear = abundances @ endmembers
     if gamma == 0.0:
         return linear
 
     n_endmembers = endmembers.shape[0]
-    nonlinear = np.zeros_like(linear)
-    for i in range(n_endmembers):
-        for j in range(i + 1, n_endmembers):
-            pair_spectrum = endmembers[i] * endmembers[j]
-            pair_weight = abundances[:, i] * abundances[:, j]
-            nonlinear += pair_weight[:, None] * pair_spectrum[None, :]
+    pair_indices = [(i, j) for i in range(n_endmembers) for j in range(i + 1, n_endmembers)]
+    gammas = np.random.uniform(0.0, gamma, size=len(pair_indices))
 
-    return linear + gamma * nonlinear
+    nonlinear = np.zeros_like(linear)
+    for (i, j), gamma_ij in zip(pair_indices, gammas):
+        pair_spectrum = endmembers[i] * endmembers[j]
+        pair_weight = abundances[:, i] * abundances[:, j]
+        nonlinear += gamma_ij * pair_weight[:, None] * pair_spectrum[None, :]
+
+    return linear + nonlinear
 
 
 def apply_snr_noise(

@@ -30,9 +30,12 @@ a per-pair nonlinearity coefficient gamma_ij in [0, 1]:
 
 where (.) is the elementwise (Hadamard) product. gamma_ij = 0 for every pair
 recovers the LMM; gamma_ij = 1 for every pair recovers the "Fan model" (see
-this project's `core_math.mix_pixels`, which implements exactly this model
-with a single *scalar* gamma shared by every pair - this module is the
-per-pair-gamma inversion counterpart of that scalar forward generator).
+this project's `core_math.mix_pixels`, which implements exactly this model:
+for `nonlinearity_gamma > 0` it draws its own per-pair gamma_ij independently
+from Uniform(0, nonlinearity_gamma), fixed across all pixels in the call -
+this module's inversion counterpart instead *fits* a gamma_ij per pixel per
+pair, which is over-parameterized relative to that shared-per-pair generative
+ground truth, not an attempt to recover it exactly).
 
 The inversion minimizes the squared reconstruction error
 
