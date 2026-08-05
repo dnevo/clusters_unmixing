@@ -125,6 +125,36 @@ def plot_cluster_overview(
     return fig
 
 
+def format_mean_std(mean: float, std: float, digits: int = 4) -> str:
+    """Render a metric as ``mean±std`` to a fixed number of decimal places.
+
+    ``std`` is NaN for a group with a single sample (e.g. ``num_seeds=1``,
+    where ``groupby(...).std(ddof=1)`` is undefined) - shown as the mean alone
+    rather than a misleading ``±0.0000``.
+    """
+    if pd.isna(std):
+        return f"{mean:.{digits}f}"
+    return f"{mean:.{digits}f}±{std:.{digits}f}"
+
+
+def build_stability_table(model_df: pd.DataFrame, metric: str) -> pd.DataFrame:
+    """Aggregate a metric's per-seed values (see model_summary.csv's 'seed'
+    column) into one ``mean±std`` string per resolved run and model, so
+    stability across seeds can be read off directly instead of comparing raw
+    per-seed rows by eye.
+    """
+    subset = model_df[model_df['metric'] == metric]
+    id_cols = {'run_index', 'parent_run_index', 'run_overrides', 'seed', 'metric'}
+    model_cols = [c for c in subset.columns if c not in id_cols]
+    grouped = subset.groupby(['run_index', 'run_overrides'], sort=False)[model_cols]
+    mean_df = grouped.mean()
+    std_df = grouped.std(ddof=1)
+    return pd.DataFrame(
+        {col: [format_mean_std(m, s) for m, s in zip(mean_df[col], std_df[col])] for col in model_cols},
+        index=mean_df.index,
+    )
+
+
 def abundance_vector(row: pd.Series) -> np.ndarray:
     cols = sorted([c for c in row.index if str(c).startswith('endmember_')])
     return row[cols].to_numpy(dtype=float)
@@ -272,7 +302,7 @@ def run_experiments_notebook(project_root: Path) -> None:
 
         display(Markdown('### Model metrics'))
         run_model = model_df[model_df['parent_run_index'] == run_index].drop(columns=['parent_run_index'])
-        run_model_indexed = run_model.set_index(['run_index', 'run_overrides', 'metric'])
+        run_model_indexed = run_model.set_index(['run_index', 'run_overrides', 'seed', 'metric'])
 
         display(Markdown('#### Abundance RMSE'))
         display(run_model_indexed.xs('abundance_rmse', level='metric', drop_level=False))
@@ -293,3 +323,15 @@ def run_experiments_notebook(project_root: Path) -> None:
                 abundance_rows=abundance_rows,
                 snr_db=snr_db,
             ))
+
+    display(Markdown('---\n## Stability across seeds'))
+    display(Markdown(
+        f'Each resolved run was repeated with `num_seeds={experiment_config.num_seeds}` seed(s) '
+        f'(0..{experiment_config.num_seeds - 1}); cells are mean±std across seeds, 4 decimal places.'
+    ))
+
+    display(Markdown('### Abundance RMSE'))
+    display(build_stability_table(model_df, 'abundance_rmse'))
+
+    display(Markdown('### Reconstruction RMSE'))
+    display(build_stability_table(model_df, 'reconstruction_rmse'))

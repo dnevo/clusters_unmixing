@@ -15,33 +15,34 @@ def mix_pixels(abundances: np.ndarray, endmembers: np.ndarray, gamma: float = 0.
     ``gamma_ij * a_i * a_j * (m_i ⊙ m_j)`` term (elementwise product of the two
     endmember spectra), approximating the multiple-scattering ("double bounce")
     interaction between two distinct materials touching at sub-pixel scale. Each
-    pair's coefficient ``gamma_ij`` is drawn independently from ``Uniform(0, gamma)``,
-    once per call and shared across every pixel - it represents a fixed property of
-    that endmember pair, not something that varies pixel to pixel. For chemically
-    graded soil cluster sets (e.g. 6clusters_thomas), treat gamma as a numerical
-    robustness knob rather than a physically motivated simulation, since the
-    endmembers aren't optically distinct materials.
+    pixel draws its own ``gamma_ij`` independently from ``Uniform(0, gamma)`` for
+    every pair, matching the per-pixel-per-pair granularity that this project's
+    GBM inversion (``models/gbm.py``) fits. For chemically graded soil cluster
+    sets (e.g. 6clusters_thomas), treat gamma as a numerical robustness knob
+    rather than a physically motivated simulation, since the endmembers aren't
+    optically distinct materials.
 
     Parameters
     ----------
     abundances : (n_pixels, n_endmembers)
     endmembers : (n_endmembers, n_bands)
-    gamma : upper bound in [0, 1] for the per-pair ``Uniform(0, gamma)`` coefficients;
-        0.0 disables the nonlinear term entirely.
+    gamma : upper bound in [0, 1] for the per-pixel, per-pair ``Uniform(0, gamma)``
+        coefficients; 0.0 disables the nonlinear term entirely.
     """
     linear = abundances @ endmembers
     if gamma == 0.0:
         return linear
 
+    n_pixels = abundances.shape[0]
     n_endmembers = endmembers.shape[0]
     pair_indices = [(i, j) for i in range(n_endmembers) for j in range(i + 1, n_endmembers)]
-    gammas = np.random.uniform(0.0, gamma, size=len(pair_indices))
+    gammas = np.random.uniform(0.0, gamma, size=(n_pixels, len(pair_indices)))
 
     nonlinear = np.zeros_like(linear)
-    for (i, j), gamma_ij in zip(pair_indices, gammas):
+    for k, (i, j) in enumerate(pair_indices):
         pair_spectrum = endmembers[i] * endmembers[j]
         pair_weight = abundances[:, i] * abundances[:, j]
-        nonlinear += gamma_ij * pair_weight[:, None] * pair_spectrum[None, :]
+        nonlinear += (gammas[:, k] * pair_weight)[:, None] * pair_spectrum[None, :]
 
     return linear + nonlinear
 

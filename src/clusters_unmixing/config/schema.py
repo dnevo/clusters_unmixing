@@ -318,6 +318,19 @@ class ExperimentConfig(BaseModel):
             "(`pip install -e .[wandb]`) and a logged-in wandb account."
         ),
     )
+    num_seeds: int = Field(
+        1,
+        ge=1,
+        description=(
+            "Number of times every resolved run is repeated end-to-end (synthetic "
+            "data generation through model fitting), once per seed in "
+            "range(num_seeds) - i.e. seeds 0, 1, ..., num_seeds - 1. Each seed's "
+            "per-model metrics are tagged with a 'seed' column in model_summary.csv, "
+            "so downstream analysis (e.g. the review notebook's stability tables) can "
+            "report mean +/- std across seeds instead of a single point estimate. "
+            "1 keeps the historical single-seed (seed=0) behavior."
+        ),
+    )
 
     @field_validator("runs")
     @classmethod

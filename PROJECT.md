@@ -180,6 +180,13 @@ For each configured run in `runs`:
 11. **Write outputs**: `cosine_similarity_summary.csv`, `model_summary.csv`,
     `abundance_preview.csv` under `experiments/outputs/{experiment_name}/`.
 
+Steps 4-10 repeat once per seed in `range(num_seeds)` (top-level `num_seeds` config
+field, default `1`), reseeding every RNG (`_set_global_seeds`) before each repetition so
+each seed's synthetic data and model fits are independently reproducible. Only step 10's
+per-model metrics are collected per seed (tagged with a `seed` column in
+`model_summary.csv`); steps 7 and the preview-pixel logging of step 10 are
+seed-independent (or purely illustrative) and are recorded once, from seed 0.
+
 ## Synthetic data generation
 
 `data/synthetic.py::generate_samples(num_samples, max_non_zero_endmembers,
@@ -225,15 +232,15 @@ exactly `abundances @ endmembers`.
 pixel = sum_i a_i * m_i  +  sum_{i<j} gamma_ij * a_i * a_j * (m_i ⊙ m_j)
 ```
 
-`gamma=0` recovers the LMM exactly (no coefficients are drawn). For `gamma > 0`, each
-endmember pair's own coefficient `gamma_ij` is drawn independently from
-`Uniform(0, gamma)`, once per call and shared across every pixel — it represents a fixed
-property of that endmember pair, not something that varies pixel to pixel. `gamma=1`
-is the upper bound at which a pair's coefficient can reach the full Fan-model strength
-(no free parameter, full pairwise interaction), but individual draws are typically
-smaller. This models the classic bilinear/GBM story of light bouncing once between two
-different materials before reaching the sensor. It's wired into `runs[*].nonlinearity_gamma`
-in `configuration.yaml`, so any run can be swept from purely linear to strongly nonlinear.
+`gamma=0` recovers the LMM exactly (no coefficients are drawn). For `gamma > 0`, every
+pixel draws its own coefficient `gamma_ij` for each endmember pair independently from
+`Uniform(0, gamma)` — the same per-pixel-per-pair granularity that this project's GBM
+inversion (`models/gbm.py`) fits. `gamma=1` is the upper bound at which a pair's
+coefficient can reach the full Fan-model strength (no free parameter, full pairwise
+interaction), but individual draws are typically smaller. This models the classic
+bilinear/GBM story of light bouncing once between two different materials before
+reaching the sensor. It's wired into `runs[*].nonlinearity_gamma` in
+`configuration.yaml`, so any run can be swept from purely linear to strongly nonlinear.
 
 As noted in the domain section, this project's specific cluster set (chemically graded
 variants of one soil, not optically distinct materials) doesn't have strong physical
@@ -292,6 +299,10 @@ fairly (they never "trained" on any of it), unlike the supervised NN models.
 `experiments/configs/configuration.yaml`. Top-level fields:
 
 - `experiment_name` — output folder name under `experiments/outputs/`.
+- `num_seeds` — repeat every resolved run end-to-end with seeds `0, 1, ..., num_seeds - 1`
+  (default `1`, i.e. the historical single-seed behavior). Each seed's per-model metrics
+  land as their own row in `model_summary.csv` (see "Outputs" below), so stability across
+  seeds can be read off as mean +/- std rather than a single point estimate.
 - `cluster_sets` — list of `{name, path}` cluster CSVs available to runs.
 - `models` — per-model-name hyperparameters (validated per-model where a stronger
   schema exists, e.g. `mlp`'s `MLPParamsModel`; otherwise passed through as
@@ -329,9 +340,10 @@ Each run batch writes results under `experiments/outputs/{experiment_name}/`:
 - `cosine_similarity_summary.csv` — per-run, per-stage endmember separability
   statistics (`condition_number`, `mean_abs_offdiag`, `max_abs_offdiag`, `min_offdiag`,
   `max_offdiag`).
-- `model_summary.csv` — one row per run and metric (`abundance_rmse`,
+- `model_summary.csv` — one row per run, seed, and metric (`abundance_rmse`,
   `reconstruction_rmse`), one column per configured model, computed on the shared
-  held-out test pixels.
+  held-out test pixels. The review notebook's stability tables aggregate the `seed`
+  rows into `mean±std` per run/model.
 - `abundance_preview.csv` — a handful of preview pixels per run, with `pixel_index`,
   `source` (`true` or a model name), error columns, and `endmember_*` abundance values —
   intended for the notebook's per-pixel comparison tables/plots.

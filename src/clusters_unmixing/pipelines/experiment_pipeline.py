@@ -121,11 +121,11 @@ def _set_global_seeds(seed: int, extra_reproducibility: bool = False, skip_stric
     """Reset every RNG this project touches, so a run's synthetic data and model
     training are reproducible given the same seed and config.
 
-    Called once per experiment run (not once per process), so each run's
-    synthetic-pixel generation is independently reproducible regardless of run
-    order or how many runs came before it. ``torch.manual_seed`` also reseeds
-    CUDA's generators, so no separate ``torch.cuda.manual_seed_all`` call is
-    needed.
+    Called once per (run, seed) combination (not once per process), so each
+    run/seed's synthetic-pixel generation is independently reproducible
+    regardless of run order or how many runs/seeds came before it.
+    ``torch.manual_seed`` also reseeds CUDA's generators, so no separate
+    ``torch.cuda.manual_seed_all`` call is needed.
 
     ``extra_reproducibility=True`` additionally asks for bit-exact CUDA
     determinism, following PyTorch's own reproducibility recipe
@@ -242,133 +242,146 @@ def run_experiments(exp: ExperimentConfig) -> dict[str, Any]:
         wavelengths, raw_endmembers = load_wavelength_and_cluster_matrix(cluster_path)
 
         run_has_mamba = any(model_spec["name"] == "mamba" for model_spec in run["models"])
-        _set_global_seeds(0, extra_reproducibility=exp.extra_reproducibility, skip_strict_determinism=run_has_mamba)
-        raw_pixels, true_abundances = _make_synthetic_pixels(
-            raw_endmembers,
-            run["num_pixels"],
-            run["snr_db"],
-            run["nonlinearity_gamma"],
-            run["abundance_distribution"],
-            run["dirichlet_alpha"],
-        )
 
-        stage_projections = _build_stage_projections(
-            run,
-            wavelengths,
-            raw_endmembers,
-            raw_pixels,
-        )
-        _, projected_endmembers, projected_pixels = stage_projections[-1]
-        test_indices = _make_held_out_test_indices(projected_pixels.shape[0])
-        for stage_name, stage_endmembers, _ in stage_projections:
-            matrix = compute_cosine_similarity_matrix(stage_endmembers)
-            cosine_similarity_summary_rows.append({
-                'run_index': idx,
-                'parent_run_index': parent_run_index,
-                'run_overrides': run_overrides_label,
-                'stage': stage_name,
-                'condition_number': compute_condition_number(stage_endmembers),
-                **summarize_cosine_similarity_matrix(matrix),
-            })
-
-
-        preview_pixels = np.random.choice(true_abundances.shape[0], size=2, replace=False).tolist()
-        preview_pixels.sort()
-        true_preview_rows = [
-            _abundance_preview_row(
-                idx,
-                parent_run_index,
-                run_overrides_label,
-                sample_idx,
-                'true',
-                true_abundances[sample_idx],
-                0.0,
-                rmse(true_abundances[sample_idx] @ projected_endmembers, projected_pixels[sample_idx]),
+        for seed in range(exp.num_seeds):
+            _set_global_seeds(seed, extra_reproducibility=exp.extra_reproducibility, skip_strict_determinism=run_has_mamba)
+            raw_pixels, true_abundances = _make_synthetic_pixels(
+                raw_endmembers,
+                run["num_pixels"],
+                run["snr_db"],
+                run["nonlinearity_gamma"],
+                run["abundance_distribution"],
+                run["dirichlet_alpha"],
             )
-            for sample_idx in preview_pixels
-        ]
-        abundance_preview_rows.extend(true_preview_rows)
 
-        for model_spec in run['models']:
-            abundances, diagnostics = run_registered_model(
-                model_name=model_spec['name'],
-                endmembers=projected_endmembers,
-                pixels=projected_pixels,
-                true_abundances=true_abundances,
-                params=model_spec['params'],
-                test_indices=test_indices,
-                run_label=f"Run {idx}/{len(runs)}{run_overrides_suffix} | model={model_spec['label']}",
+            stage_projections = _build_stage_projections(
+                run,
+                wavelengths,
+                raw_endmembers,
+                raw_pixels,
             )
-            # Score every model on the same held-out pixels (see
-            # _make_held_out_test_indices) rather than the full pixel set, so
-            # models that trained on some of these pixels (mlp,
-            # convnext1d) aren't compared unfairly against ones that didn't
-            # (sunsal, vpgdu).
-            test_abundances_pred = abundances[test_indices]
-            test_true_abundances = true_abundances[test_indices]
-            test_projected_pixels = projected_pixels[test_indices]
-            # Always a plain linear reconstruction from the returned abundances -
-            # deliberately the same formula for every model, including nonlinear ones
-            # (gbm, mlm), so reconstruction_rmse is comparable apples-to-apples. This
-            # means it does NOT credit gbm/mlm for their own internally-fitted
-            # nonlinear correction term (per-pair gamma_ij, or scalar P - see their
-            # docstrings), so on nonlinearity_gamma>0 runs it shows a nonzero floor
-            # even for a perfectly recovered abundance vector; it's testing "do these
-            # abundances explain the pixel under plain LMM", not "how good was the
-            # model's own nonlinear fit".
-            reconstructed_pixels = test_abundances_pred @ projected_endmembers
-            model_metrics = {
-                'abundance_rmse': rmse(test_abundances_pred, test_true_abundances),
-                'reconstruction_rmse': rmse(reconstructed_pixels, test_projected_pixels),
-            }
-            for metric_name, value in model_metrics.items():
-                model_summary_rows.append({
-                    'run_index': idx,
-                    'parent_run_index': parent_run_index,
-                    'run_overrides': run_overrides_label,
-                    'model': model_spec['label'],
-                    'metric': metric_name,
-                    'mean': value,
-                })
-            model_preview_rows = []
-            for sample_idx in preview_pixels:
-                pred_abundances = abundances[sample_idx]
-                row = _abundance_preview_row(
-                    idx,
-                    parent_run_index,
-                    run_overrides_label,
-                    sample_idx,
-                    model_spec['label'],
-                    pred_abundances,
-                    rmse(pred_abundances, true_abundances[sample_idx]),
-                    rmse(pred_abundances @ projected_endmembers, projected_pixels[sample_idx]),
-                )
-                abundance_preview_rows.append(row)
-                model_preview_rows.append(row)
+            _, projected_endmembers, projected_pixels = stage_projections[-1]
+            test_indices = _make_held_out_test_indices(projected_pixels.shape[0])
 
-            if exp.use_wandb:
-                log_model_run(
-                    project=exp.experiment_name,
-                    group=wandb_group,
-                    run_name=f"run{idx}-{model_spec['label']}",
-                    config={
+            # Endmember-only diagnostics and the abundance/pixel preview are
+            # seed-independent (cosine similarity depends only on the projected
+            # endmembers) or exist purely to eyeball a couple of example pixels -
+            # recorded once from seed 0 rather than duplicated num_seeds times.
+            if seed == 0:
+                for stage_name, stage_endmembers, _ in stage_projections:
+                    matrix = compute_cosine_similarity_matrix(stage_endmembers)
+                    cosine_similarity_summary_rows.append({
                         'run_index': idx,
                         'parent_run_index': parent_run_index,
-                        'run_overrides': run['run_overrides'],
-                        'cluster_set': run['cluster_set'],
-                        'normalization': run['normalization'],
-                        'abundance_distribution': run['abundance_distribution'],
-                        'dirichlet_alpha': run['dirichlet_alpha'],
-                        'num_pixels': run['num_pixels'],
-                        'snr_db': run['snr_db'],
-                        'nonlinearity_gamma': run['nonlinearity_gamma'],
-                        'model_name': model_spec['name'],
-                        'model_label': model_spec['label'],
-                        **model_spec['params'],
-                    },
-                    metrics={**model_metrics, **diagnostics},
-                    abundance_preview_rows=true_preview_rows + model_preview_rows,
+                        'run_overrides': run_overrides_label,
+                        'stage': stage_name,
+                        'condition_number': compute_condition_number(stage_endmembers),
+                        **summarize_cosine_similarity_matrix(matrix),
+                    })
+
+                preview_pixels = np.random.choice(true_abundances.shape[0], size=2, replace=False).tolist()
+                preview_pixels.sort()
+                true_preview_rows = [
+                    _abundance_preview_row(
+                        idx,
+                        parent_run_index,
+                        run_overrides_label,
+                        sample_idx,
+                        'true',
+                        true_abundances[sample_idx],
+                        0.0,
+                        rmse(true_abundances[sample_idx] @ projected_endmembers, projected_pixels[sample_idx]),
+                    )
+                    for sample_idx in preview_pixels
+                ]
+                abundance_preview_rows.extend(true_preview_rows)
+
+            for model_spec in run['models']:
+                abundances, diagnostics = run_registered_model(
+                    model_name=model_spec['name'],
+                    endmembers=projected_endmembers,
+                    pixels=projected_pixels,
+                    true_abundances=true_abundances,
+                    params=model_spec['params'],
+                    test_indices=test_indices,
+                    run_label=f"Run {idx}/{len(runs)}{run_overrides_suffix} | seed={seed} | model={model_spec['label']}",
                 )
+                # Score every model on the same held-out pixels (see
+                # _make_held_out_test_indices) rather than the full pixel set, so
+                # models that trained on some of these pixels (mlp,
+                # convnext1d) aren't compared unfairly against ones that didn't
+                # (sunsal, vpgdu).
+                test_abundances_pred = abundances[test_indices]
+                test_true_abundances = true_abundances[test_indices]
+                test_projected_pixels = projected_pixels[test_indices]
+                # Always a plain linear reconstruction from the returned abundances -
+                # deliberately the same formula for every model, including nonlinear ones
+                # (gbm, mlm), so reconstruction_rmse is comparable apples-to-apples. This
+                # means it does NOT credit gbm/mlm for their own internally-fitted
+                # nonlinear correction term (per-pair gamma_ij, or scalar P - see their
+                # docstrings), so on nonlinearity_gamma>0 runs it shows a nonzero floor
+                # even for a perfectly recovered abundance vector; it's testing "do these
+                # abundances explain the pixel under plain LMM", not "how good was the
+                # model's own nonlinear fit".
+                reconstructed_pixels = test_abundances_pred @ projected_endmembers
+                model_metrics = {
+                    'abundance_rmse': rmse(test_abundances_pred, test_true_abundances),
+                    'reconstruction_rmse': rmse(reconstructed_pixels, test_projected_pixels),
+                }
+                for metric_name, value in model_metrics.items():
+                    model_summary_rows.append({
+                        'run_index': idx,
+                        'parent_run_index': parent_run_index,
+                        'run_overrides': run_overrides_label,
+                        'seed': seed,
+                        'model': model_spec['label'],
+                        'metric': metric_name,
+                        'mean': value,
+                    })
+
+                wandb_preview_rows: list[dict[str, Any]] = []
+                if seed == 0:
+                    model_preview_rows = []
+                    for sample_idx in preview_pixels:
+                        pred_abundances = abundances[sample_idx]
+                        row = _abundance_preview_row(
+                            idx,
+                            parent_run_index,
+                            run_overrides_label,
+                            sample_idx,
+                            model_spec['label'],
+                            pred_abundances,
+                            rmse(pred_abundances, true_abundances[sample_idx]),
+                            rmse(pred_abundances @ projected_endmembers, projected_pixels[sample_idx]),
+                        )
+                        abundance_preview_rows.append(row)
+                        model_preview_rows.append(row)
+                    wandb_preview_rows = true_preview_rows + model_preview_rows
+
+                if exp.use_wandb:
+                    log_model_run(
+                        project=exp.experiment_name,
+                        group=wandb_group,
+                        run_name=f"run{idx}-seed{seed}-{model_spec['label']}",
+                        config={
+                            'run_index': idx,
+                            'parent_run_index': parent_run_index,
+                            'run_overrides': run['run_overrides'],
+                            'seed': seed,
+                            'cluster_set': run['cluster_set'],
+                            'normalization': run['normalization'],
+                            'abundance_distribution': run['abundance_distribution'],
+                            'dirichlet_alpha': run['dirichlet_alpha'],
+                            'num_pixels': run['num_pixels'],
+                            'snr_db': run['snr_db'],
+                            'nonlinearity_gamma': run['nonlinearity_gamma'],
+                            'model_name': model_spec['name'],
+                            'model_label': model_spec['label'],
+                            **model_spec['params'],
+                        },
+                        metrics={**model_metrics, **diagnostics},
+                        abundance_preview_rows=wandb_preview_rows,
+                    )
 
     cosine_similarity_summary_path = output_dir / 'cosine_similarity_summary.csv'
     model_summary_path = output_dir / 'model_summary.csv'
@@ -377,7 +390,11 @@ def run_experiments(exp: ExperimentConfig) -> dict[str, Any]:
 
     model_summary_df = pd.DataFrame(model_summary_rows)
     run_meta = model_summary_df[['run_index', 'parent_run_index', 'run_overrides']].drop_duplicates('run_index')
-    model_pivot = model_summary_df.pivot(index=['run_index', 'metric'], columns='model', values='mean').reset_index()
+    # 'seed' joins 'run_index'/'metric' in the pivot index (rather than being
+    # aggregated away here) so model_summary.csv keeps one row per seed; the
+    # review notebook's stability tables do the mean/std aggregation across
+    # seeds for display.
+    model_pivot = model_summary_df.pivot(index=['run_index', 'seed', 'metric'], columns='model', values='mean').reset_index()
     # pivot() sorts columns alphabetically; reorder to first-appearance order
     # in model_summary_rows, which follows each run's `models` list as given
     # in the experiment YAML, so the CSV's model columns read left-to-right
@@ -385,7 +402,7 @@ def run_experiments(exp: ExperimentConfig) -> dict[str, Any]:
     model_order = list(dict.fromkeys(model_summary_df['model']))
     model_cols = [c for c in model_order if c in model_pivot.columns]
     model_pivot.merge(run_meta, on='run_index', how='left')[
-        ['run_index', 'parent_run_index', 'run_overrides', 'metric'] + model_cols
+        ['run_index', 'parent_run_index', 'run_overrides', 'seed', 'metric'] + model_cols
     ].to_csv(model_summary_path, index=False, float_format='%.6f')
     abundance_preview_df = pd.DataFrame(abundance_preview_rows).assign(
         source_order=lambda df: (df['source'] != 'true').astype(int)

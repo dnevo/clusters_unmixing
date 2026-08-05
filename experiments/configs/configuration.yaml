@@ -10,6 +10,12 @@ extra_reproducibility: false
 # extra (pip install -e .[wandb]) and a logged-in wandb account.
 use_wandb: false
 
+# Repeat every resolved run end-to-end with seeds 0, 1, ..., num_seeds - 1, so
+# model_summary.csv carries one row per seed and the review notebook's
+# stability tables can report each model's RMSE as mean +/- std across seeds
+# instead of a single point estimate. 1 = historical single-seed behavior.
+num_seeds: 2
+
 cluster_sets:
 
   - name: 6clusters_thomas
