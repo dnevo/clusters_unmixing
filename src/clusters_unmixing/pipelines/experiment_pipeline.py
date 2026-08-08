@@ -18,7 +18,7 @@ from clusters_unmixing.dataio import load_wavelength_and_cluster_matrix
 from clusters_unmixing.models.runner_registry import run_registered_model
 from clusters_unmixing.preprocessing.normalization import apply_normalization
 from clusters_unmixing.preprocessing.band_selection import select_wavelength_ranges
-from clusters_unmixing.wandb_logging import log_batch_artifacts, log_model_run
+from clusters_unmixing.wandb_logging import WANDB_PROJECT, log_batch_artifacts, log_model_run
 
 def _expand_param_grid(params: dict[str, list[Any]]) -> list[dict[str, Any]]:
     """Cartesian product of a {param_name: [values]} mapping. No keys -> one empty combination."""
@@ -226,7 +226,7 @@ def run_experiments(exp: ExperimentConfig) -> dict[str, Any]:
 
     # Groups every W&B run this batch logs (one per model call, plus the
     # summary run at the end) so they stay browsable together in the W&B UI.
-    wandb_group = f"{exp.experiment_name}_{datetime.now():%Y%m%d-%H%M%S}"
+    wandb_group = f"{datetime.now():%Y%m%d-%H%M%S}"
 
     endmember_separability_summary_rows: list[dict[str, Any]] = []
     model_summary_rows: list[dict[str, Any]] = []
@@ -304,7 +304,7 @@ def run_experiments(exp: ExperimentConfig) -> dict[str, Any]:
                     true_abundances=true_abundances,
                     params=model_spec['params'],
                     test_indices=test_indices,
-                    run_label=f"Run {idx}/{len(runs)}{run_overrides_suffix} | seed={seed} | model={model_spec['label']}",
+                    run_label=f"seed={seed} | Run {idx}/{len(runs)}{run_overrides_suffix} | model={model_spec['label']}",
                 )
                 # Score every model on the same held-out pixels (see
                 # _make_held_out_test_indices) rather than the full pixel set, so
@@ -330,10 +330,10 @@ def run_experiments(exp: ExperimentConfig) -> dict[str, Any]:
                 }
                 for metric_name, value in model_metrics.items():
                     model_summary_rows.append({
+                        'seed': seed,
                         'run_index': idx,
                         'parent_run_index': parent_run_index,
                         'run_overrides': run_overrides_label,
-                        'seed': seed,
                         'model': model_spec['label'],
                         'metric': metric_name,
                         'mean': value,
@@ -360,7 +360,7 @@ def run_experiments(exp: ExperimentConfig) -> dict[str, Any]:
 
                 if exp.use_wandb:
                     log_model_run(
-                        project=exp.experiment_name,
+                        project=WANDB_PROJECT,
                         group=wandb_group,
                         run_name=f"run{idx}-seed{seed}-{model_spec['label']}",
                         config={
@@ -402,7 +402,7 @@ def run_experiments(exp: ExperimentConfig) -> dict[str, Any]:
     model_order = list(dict.fromkeys(model_summary_df['model']))
     model_cols = [c for c in model_order if c in model_pivot.columns]
     model_pivot.merge(run_meta, on='run_index', how='left')[
-        ['run_index', 'parent_run_index', 'run_overrides', 'seed', 'metric'] + model_cols
+        ['seed', 'run_index', 'parent_run_index', 'run_overrides', 'metric'] + model_cols
     ].to_csv(model_summary_path, index=False, float_format='%.6f')
     abundance_preview_df = pd.DataFrame(abundance_preview_rows).assign(
         source_order=lambda df: (df['source'] != 'true').astype(int)
@@ -413,10 +413,10 @@ def run_experiments(exp: ExperimentConfig) -> dict[str, Any]:
 
     if exp.use_wandb:
         log_batch_artifacts(
-            project=exp.experiment_name,
+            project=WANDB_PROJECT,
             group=wandb_group,
-            run_name=f"{exp.experiment_name}-summary",
-            artifact_name=f"{exp.experiment_name}-outputs",
+            run_name=f"{wandb_group}-summary",
+            artifact_name=f"{wandb_group}-outputs",
             csv_paths={
                 'endmember_separability_summary': endmember_separability_summary_path,
                 'model_summary': model_summary_path,
@@ -425,7 +425,6 @@ def run_experiments(exp: ExperimentConfig) -> dict[str, Any]:
         )
 
     return {
-        'experiment_name': exp.experiment_name,
         'output_dir': str(output_dir),
         'endmember_separability_summary_path': str(endmember_separability_summary_path),
         'n_runs': len(runs),

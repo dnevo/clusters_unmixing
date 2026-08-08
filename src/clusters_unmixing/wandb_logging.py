@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 
 WANDB_ENTITY = "nev1958a_team"
+WANDB_PROJECT = "clusters_unmixing"
 
 
 def _import_wandb():

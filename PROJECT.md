@@ -178,7 +178,7 @@ For each configured run in `runs`:
     held-out test pixels for every model; a handful of preview pixels are logged with
     their true and per-model estimated abundances for notebook review.
 11. **Write outputs**: `endmember_separability_summary.csv`, `model_summary.csv`,
-    `abundance_preview.csv` under `experiments/outputs/{experiment_name}/`.
+    `abundance_preview.csv` under `experiments/outputs/`.
 
 Steps 4-10 repeat once per seed in `range(num_seeds)` (top-level `num_seeds` config
 field, default `1`), reseeding every RNG (`_set_global_seeds`) before each repetition so
@@ -298,7 +298,6 @@ fairly (they never "trained" on any of it), unlike the supervised NN models.
 `ExperimentConfig.from_config_file(project_root)` loads
 `experiments/configs/configuration.yaml`. Top-level fields:
 
-- `experiment_name` — output folder name under `experiments/outputs/`.
 - `num_seeds` — repeat every resolved run end-to-end with seeds `0, 1, ..., num_seeds - 1`
   (default `1`, i.e. the historical single-seed behavior). Each seed's per-model metrics
   land as their own row in `model_summary.csv` (see "Outputs" below), so stability across
@@ -335,7 +334,7 @@ root.
 
 ## Outputs
 
-Each run batch writes results under `experiments/outputs/{experiment_name}/`:
+Each run batch writes results under `experiments/outputs/`:
 
 - `endmember_separability_summary.csv` — per-run, per-stage endmember separability
   statistics (`condition_number`, `mean_abs_offdiag`, `max_abs_offdiag`, `min_offdiag`,

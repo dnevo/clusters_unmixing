@@ -295,7 +295,6 @@ class ModelRunConfig(BaseModel):
 
 class ExperimentConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
-    experiment_name: str = "cosine_similarity_experiment"
     cluster_sets: list[ClusterSetConfig]
     models: list[ModelSpecConfig] = Field(default_factory=list)
     runs: list[ModelRunConfig] = Field(default_factory=list, validate_default=True)
@@ -370,7 +369,7 @@ class ExperimentConfig(BaseModel):
 
     @property
     def experiment_output_dir(self) -> Path:
-        return self.project_root / "experiments" / "outputs" / self.experiment_name
+        return self.project_root / "experiments" / "outputs"
 
     @classmethod
     def from_config_file(cls, project_root: Path) -> "ExperimentConfig":

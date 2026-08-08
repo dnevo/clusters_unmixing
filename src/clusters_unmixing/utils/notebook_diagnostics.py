@@ -216,7 +216,7 @@ def run_experiments_notebook(project_root: Path) -> None:
     model_df = pd.read_csv(model_summary_path)
     abundance_df = pd.read_csv(abundance_preview_path)
 
-    display(Markdown(f"**Experiment name:** `{result['experiment_name']}`\n\n**Output dir:** `{result['output_dir']}`"))
+    display(Markdown(f"**Output dir:** `{result['output_dir']}`"))
 
     for run_index, run_cfg in enumerate(experiment_config.runs, start=1):
         display(Markdown(f'---\n## Run {run_index}/{len(experiment_config.runs)}'))
@@ -296,13 +296,13 @@ def run_experiments_notebook(project_root: Path) -> None:
 
         display(Markdown('### Endmember separability metrics'))
         run_endmember_separability = endmember_separability_df[endmember_separability_df['parent_run_index'] == run_index].drop(
-            columns=['parent_run_index']
-        ).set_index(['run_index', 'run_overrides', 'stage'])
+            columns=['run_index', 'parent_run_index', 'run_overrides']
+        ).drop_duplicates().set_index('stage')
         display(run_endmember_separability.style.format({'condition_number': '{:.1f}'}))
 
         display(Markdown('### Model metrics'))
         run_model = model_df[model_df['parent_run_index'] == run_index].drop(columns=['parent_run_index'])
-        run_model_indexed = run_model.set_index(['run_index', 'run_overrides', 'seed', 'metric'])
+        run_model_indexed = run_model.set_index(['seed', 'run_index', 'run_overrides', 'metric'])
 
         display(Markdown('#### Abundance RMSE'))
         display(run_model_indexed.xs('abundance_rmse', level='metric', drop_level=False))

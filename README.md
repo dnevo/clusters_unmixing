@@ -74,7 +74,6 @@ If your editor reports unresolved imports for `plotly` or `IPython` in the noteb
 
 Key sections in the config:
 
-- `experiment_name`: output folder name under `experiments/outputs/`
 - `extra_reproducibility`: opt-in bit-exact CUDA determinism (performance cost; auto-skipped for runs including `mamba`)
 - `use_wandb`: opt-in Weights & Biases logging - one run per model call plus a batch summary run with the output CSVs as an artifact; requires `pip install -e .[wandb]` and a logged-in wandb account
 - `cluster_sets`: available input cluster CSV files
@@ -103,9 +102,9 @@ Relative paths in the config are resolved from the supplied project root.
 
 Each run batch writes results under:
 
-- `experiments/outputs/{experiment_name}/endmember_separability_summary.csv`
-- `experiments/outputs/{experiment_name}/model_summary.csv`
-- `experiments/outputs/{experiment_name}/abundance_preview.csv`
+- `experiments/outputs/endmember_separability_summary.csv`
+- `experiments/outputs/model_summary.csv`
+- `experiments/outputs/abundance_preview.csv`
 
 At a high level:
 

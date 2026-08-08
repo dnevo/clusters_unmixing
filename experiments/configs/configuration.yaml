@@ -1,5 +1,3 @@
-experiment_name: cluster_corr_options
-
 # Ask PyTorch/cuDNN/cuBLAS for bit-exact CUDA determinism, at a performance
 # cost (see pipelines/experiment_pipeline.py's _set_global_seeds docstring).
 # Automatically skipped for runs that include the mamba model.
@@ -170,11 +168,11 @@ runs:
     models:
       - sunsal
       - vpgdu
-      #- mlm
+      - mlm
       - gbm
       - mlp
       - kan
-      #- mamba
+      - mamba
 
     sweep_params:
       snr_db: [20.0, 30.0, .inf]   # must be ".inf", not "inf" - see note above
