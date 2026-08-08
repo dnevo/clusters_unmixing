@@ -206,13 +206,13 @@ def run_experiments_notebook(project_root: Path) -> None:
 
     model_summary_path = Path(result['model_evaluation']['model_summary_path'])
     abundance_preview_path = Path(result['model_evaluation']['abundance_preview_path'])
-    cosine_similarity_summary_path = Path(result['cosine_similarity_summary_path'])
+    endmember_separability_summary_path = Path(result['endmember_separability_summary_path'])
 
     # Not indexed by run_index here: a swept run expands into several resolved
     # run_index values sharing one parent_run_index, so filtering by
     # parent_run_index (below, per notebook section) is what actually maps back
     # to a single configured run.
-    cosine_similarity_df = pd.read_csv(cosine_similarity_summary_path)
+    endmember_separability_df = pd.read_csv(endmember_separability_summary_path)
     model_df = pd.read_csv(model_summary_path)
     abundance_df = pd.read_csv(abundance_preview_path)
 
@@ -295,10 +295,10 @@ def run_experiments_notebook(project_root: Path) -> None:
             ))
 
         display(Markdown('### Endmember separability metrics'))
-        run_cosine_similarity = cosine_similarity_df[cosine_similarity_df['parent_run_index'] == run_index].drop(
+        run_endmember_separability = endmember_separability_df[endmember_separability_df['parent_run_index'] == run_index].drop(
             columns=['parent_run_index']
         ).set_index(['run_index', 'run_overrides', 'stage'])
-        display(run_cosine_similarity.style.format({'condition_number': '{:.1f}'}))
+        display(run_endmember_separability.style.format({'condition_number': '{:.1f}'}))
 
         display(Markdown('### Model metrics'))
         run_model = model_df[model_df['parent_run_index'] == run_index].drop(columns=['parent_run_index'])

@@ -177,7 +177,7 @@ For each configured run in `runs`:
 10. **Score and log.** `abundance_rmse` and `reconstruction_rmse` are computed on the
     held-out test pixels for every model; a handful of preview pixels are logged with
     their true and per-model estimated abundances for notebook review.
-11. **Write outputs**: `cosine_similarity_summary.csv`, `model_summary.csv`,
+11. **Write outputs**: `endmember_separability_summary.csv`, `model_summary.csv`,
     `abundance_preview.csv` under `experiments/outputs/{experiment_name}/`.
 
 Steps 4-10 repeat once per seed in `range(num_seeds)` (top-level `num_seeds` config
@@ -337,7 +337,7 @@ root.
 
 Each run batch writes results under `experiments/outputs/{experiment_name}/`:
 
-- `cosine_similarity_summary.csv` — per-run, per-stage endmember separability
+- `endmember_separability_summary.csv` — per-run, per-stage endmember separability
   statistics (`condition_number`, `mean_abs_offdiag`, `max_abs_offdiag`, `min_offdiag`,
   `max_offdiag`).
 - `model_summary.csv` — one row per run, seed, and metric (`abundance_rmse`,

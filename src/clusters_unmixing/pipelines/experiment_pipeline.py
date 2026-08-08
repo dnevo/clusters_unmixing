@@ -228,7 +228,7 @@ def run_experiments(exp: ExperimentConfig) -> dict[str, Any]:
     # summary run at the end) so they stay browsable together in the W&B UI.
     wandb_group = f"{exp.experiment_name}_{datetime.now():%Y%m%d-%H%M%S}"
 
-    cosine_similarity_summary_rows: list[dict[str, Any]] = []
+    endmember_separability_summary_rows: list[dict[str, Any]] = []
     model_summary_rows: list[dict[str, Any]] = []
     abundance_preview_rows: list[dict[str, Any]] = []
 
@@ -270,7 +270,7 @@ def run_experiments(exp: ExperimentConfig) -> dict[str, Any]:
             if seed == 0:
                 for stage_name, stage_endmembers, _ in stage_projections:
                     matrix = compute_cosine_similarity_matrix(stage_endmembers)
-                    cosine_similarity_summary_rows.append({
+                    endmember_separability_summary_rows.append({
                         'run_index': idx,
                         'parent_run_index': parent_run_index,
                         'run_overrides': run_overrides_label,
@@ -383,10 +383,10 @@ def run_experiments(exp: ExperimentConfig) -> dict[str, Any]:
                         abundance_preview_rows=wandb_preview_rows,
                     )
 
-    cosine_similarity_summary_path = output_dir / 'cosine_similarity_summary.csv'
+    endmember_separability_summary_path = output_dir / 'endmember_separability_summary.csv'
     model_summary_path = output_dir / 'model_summary.csv'
     abundance_preview_path = output_dir / 'abundance_preview.csv'
-    pd.DataFrame(cosine_similarity_summary_rows).to_csv(cosine_similarity_summary_path, index=False, float_format='%.6f')
+    pd.DataFrame(endmember_separability_summary_rows).to_csv(endmember_separability_summary_path, index=False, float_format='%.6f')
 
     model_summary_df = pd.DataFrame(model_summary_rows)
     run_meta = model_summary_df[['run_index', 'parent_run_index', 'run_overrides']].drop_duplicates('run_index')
@@ -418,7 +418,7 @@ def run_experiments(exp: ExperimentConfig) -> dict[str, Any]:
             run_name=f"{exp.experiment_name}-summary",
             artifact_name=f"{exp.experiment_name}-outputs",
             csv_paths={
-                'cosine_similarity_summary': cosine_similarity_summary_path,
+                'endmember_separability_summary': endmember_separability_summary_path,
                 'model_summary': model_summary_path,
                 'abundance_preview': abundance_preview_path,
             },
@@ -427,7 +427,7 @@ def run_experiments(exp: ExperimentConfig) -> dict[str, Any]:
     return {
         'experiment_name': exp.experiment_name,
         'output_dir': str(output_dir),
-        'cosine_similarity_summary_path': str(cosine_similarity_summary_path),
+        'endmember_separability_summary_path': str(endmember_separability_summary_path),
         'n_runs': len(runs),
         'model_evaluation': {
             'n_runs': len(runs),

@@ -103,13 +103,13 @@ Relative paths in the config are resolved from the supplied project root.
 
 Each run batch writes results under:
 
-- `experiments/outputs/{experiment_name}/cosine_similarity_summary.csv`
+- `experiments/outputs/{experiment_name}/endmember_separability_summary.csv`
 - `experiments/outputs/{experiment_name}/model_summary.csv`
 - `experiments/outputs/{experiment_name}/abundance_preview.csv`
 
 At a high level:
 
-- `cosine_similarity_summary.csv` stores per-run, per-stage cosine similarity statistics (`raw`, `normalized`)
+- `endmember_separability_summary.csv` stores per-run, per-stage cosine similarity statistics (`raw`, `normalized`)
 - `model_summary.csv` stores one row per run and metric, with one column per configured model
 - `abundance_preview.csv` stores the notebook-ready abundance preview table with `pixel_index`, `source`, error columns, and `endmember_*` values
 
