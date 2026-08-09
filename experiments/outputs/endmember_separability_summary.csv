@@ -1,0 +1,4 @@
+run_index,parent_run_index,run_overrides,stage,condition_number,mean_abs_offdiag,max_abs_offdiag,min_offdiag,max_offdiag
+1,1,normalization=none,raw,1727.744849,0.997825,0.999832,0.992636,0.999832
+2,1,normalization=quadratic,raw,1727.744849,0.997825,0.999832,0.992636,0.999832
+2,1,normalization=quadratic,normalized,196.992622,0.712830,0.998450,-0.916667,0.998450
