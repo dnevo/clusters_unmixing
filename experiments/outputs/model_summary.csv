@@ -1,9 +1,9 @@
 seed,run_index,parent_run_index,run_overrides,metric,sunsal
-0,1,1,normalization=none,abundance_rmse,0.119207
+0,1,1,normalization=none,abundance_rmse,0.119541
 0,1,1,normalization=none,reconstruction_rmse,0.014392
-1,1,1,normalization=none,abundance_rmse,0.121145
+1,1,1,normalization=none,abundance_rmse,0.121552
 1,1,1,normalization=none,reconstruction_rmse,0.014408
-0,2,1,normalization=quadratic,abundance_rmse,0.119551
+0,2,1,normalization=quadratic,abundance_rmse,0.119564
 0,2,1,normalization=quadratic,reconstruction_rmse,0.014392
-1,2,1,normalization=quadratic,abundance_rmse,0.121561
+1,2,1,normalization=quadratic,abundance_rmse,0.121565
 1,2,1,normalization=quadratic,reconstruction_rmse,0.014408
