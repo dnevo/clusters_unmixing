@@ -330,8 +330,21 @@ def run_experiments_notebook(project_root: Path) -> None:
         f'(0..{experiment_config.num_seeds - 1}); cells are mean±std across seeds, 4 decimal places.'
     ))
 
+    abundance_stability = build_stability_table(model_df, 'abundance_rmse')
+    reconstruction_stability = build_stability_table(model_df, 'reconstruction_rmse')
+
     display(Markdown('### Abundance RMSE'))
-    display(build_stability_table(model_df, 'abundance_rmse'))
+    display(abundance_stability)
 
     display(Markdown('### Reconstruction RMSE'))
-    display(build_stability_table(model_df, 'reconstruction_rmse'))
+    display(reconstruction_stability)
+
+    stability_df = pd.concat(
+        [
+            abundance_stability.assign(metric='abundance_rmse'),
+            reconstruction_stability.assign(metric='reconstruction_rmse'),
+        ]
+    ).reset_index()
+    model_cols = [c for c in stability_df.columns if c not in ('run_index', 'run_overrides', 'metric')]
+    stability_path = Path(result['output_dir']) / 'stability_summary.csv'
+    stability_df[['run_index', 'run_overrides', 'metric'] + model_cols].to_csv(stability_path, index=False)

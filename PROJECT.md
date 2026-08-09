@@ -347,6 +347,11 @@ Each run batch writes results under `experiments/outputs/`:
   `source` (`true` or a model name), error columns, and `endmember_*` abundance values —
   intended for the notebook's per-pixel comparison tables/plots.
 
+The review notebook (`run_experiments_notebook`, see `utils/notebook_diagnostics.py`)
+additionally writes `stability_summary.csv` to the same directory after `run_experiments`
+returns: the `mean±std`-across-seeds stability tables it displays for `abundance_rmse` and
+`reconstruction_rmse`, one row per run/metric and one column per model.
+
 ## Running the project
 
 ```bash
