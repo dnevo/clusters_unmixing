@@ -1,0 +1,5 @@
+run_index,run_overrides,metric,sunsal
+1,normalization=none,abundance_rmse,0.1205±0.0014
+2,normalization=quadratic,abundance_rmse,0.1206±0.0014
+1,normalization=none,reconstruction_rmse,0.0144±0.0000
+2,normalization=quadratic,reconstruction_rmse,0.0144±0.0000
