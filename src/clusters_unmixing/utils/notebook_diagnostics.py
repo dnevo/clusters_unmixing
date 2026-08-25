@@ -144,7 +144,7 @@ def build_stability_table(model_df: pd.DataFrame, metric: str) -> pd.DataFrame:
     per-seed rows by eye.
     """
     subset = model_df[model_df['metric'] == metric]
-    id_cols = {'run_index', 'parent_run_index', 'run_overrides', 'seed', 'metric'}
+    id_cols = {'run_index', 'parent_run_index', 'run_overrides', 'seed', 'metric', 'dominance'}
     model_cols = [c for c in subset.columns if c not in id_cols]
     grouped = subset.groupby(['run_index', 'run_overrides'], sort=False)[model_cols]
     mean_df = grouped.mean()
@@ -205,6 +205,7 @@ def run_experiments_notebook(project_root: Path) -> None:
     }
 
     model_summary_path = Path(result['model_evaluation']['model_summary_path'])
+    model_summary_per_dominance_path = Path(result['model_evaluation']['model_summary_per_dominance_path'])
     abundance_preview_path = Path(result['model_evaluation']['abundance_preview_path'])
     endmember_separability_summary_path = Path(result['endmember_separability_summary_path'])
 
@@ -214,6 +215,7 @@ def run_experiments_notebook(project_root: Path) -> None:
     # to a single configured run.
     endmember_separability_df = pd.read_csv(endmember_separability_summary_path)
     model_df = pd.read_csv(model_summary_path)
+    dominance_df = pd.read_csv(model_summary_per_dominance_path)
     abundance_df = pd.read_csv(abundance_preview_path)
 
     display(Markdown(f"**Output dir:** `{result['output_dir']}`"))
@@ -335,6 +337,14 @@ def run_experiments_notebook(project_root: Path) -> None:
 
     display(Markdown('### Abundance RMSE'))
     display(abundance_stability)
+
+    # Same mean±std-across-seeds table, but scored separately within each
+    # ground-truth dominance class (see core_math.classify_abundance_dominance),
+    # so error concentrated on genuinely mixed pixels can be told apart from
+    # error on near-pure ones.
+    for dominance_value, dominance_label in [(1, '1-dominant'), (2, '2-dominant'), (0, 'Mixed')]:
+        display(Markdown(f'#### Abundance RMSE — {dominance_label}'))
+        display(build_stability_table(dominance_df[dominance_df['dominance'] == dominance_value], 'abundance_rmse'))
 
     display(Markdown('### Reconstruction RMSE'))
     display(reconstruction_stability)
