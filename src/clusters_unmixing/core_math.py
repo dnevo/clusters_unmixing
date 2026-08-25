@@ -7,6 +7,19 @@ def rmse(values: np.ndarray, reference: np.ndarray) -> float:
     return float(np.sqrt(np.mean(np.square(np.asarray(values) - np.asarray(reference)))))
 
 
+def classify_abundance_dominance(abundances: np.ndarray) -> np.ndarray:
+    """Classify each pixel's abundance vector by how much mass its largest one
+    or two endmembers carry: 1 (top endmember >= 60% of mass), 2 (top two
+    endmembers together >= 75%, with the second >= 25%), else 0 (mixed).
+    Ties go to 1-dominant, matching the mutually-exclusive if/elif order this
+    was ported from.
+    """
+    sorted_desc = np.sort(np.asarray(abundances, dtype=float), axis=-1)[..., ::-1]
+    one_dominant = sorted_desc[..., 0] >= 0.60
+    two_dominant = (sorted_desc[..., 1] >= 0.25) & (sorted_desc[..., 0] + sorted_desc[..., 1] >= 0.75)
+    return np.where(one_dominant, 1, np.where(two_dominant, 2, 0))
+
+
 def mix_pixels(abundances: np.ndarray, endmembers: np.ndarray, gamma: float = 0.0) -> np.ndarray:
     """Combine abundances and endmembers into pixel spectra under the Generalized Bilinear Model.
 

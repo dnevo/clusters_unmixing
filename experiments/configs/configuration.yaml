@@ -139,7 +139,7 @@ runs:
       - range_µm: [0.4, 2.5]
         reduce: none          # options: none | mean
 
-    normalization: quadratic   # options: none | quadratic
+    normalization: none   # options: none | quadratic
 
     # Synthetic abundance generator. "grid" preserves the legacy sparse,
     # discrete 0.04-step generator. "dirichlet" draws continuous abundances
@@ -172,10 +172,9 @@ runs:
       - gbm
       - mlp
       - kan
-      - mamba
+      #- mamba
 
     sweep_params:
       snr_db: [20.0, 30.0, .inf]   # must be ".inf", not "inf" - see note above
-      #normalization: [none, quadratic]
       dirichlet_alpha: [0.3, 0.4]
-      nonlinearity_gamma: [0.0]
+      nonlinearity_gamma: [0.0, 0.25]

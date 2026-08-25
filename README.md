@@ -104,6 +104,7 @@ Each run batch writes results under:
 
 - `experiments/outputs/endmember_separability_summary.csv`
 - `experiments/outputs/model_summary.csv`
+- `experiments/outputs/model_summary_per_dominance.csv`
 - `experiments/outputs/abundance_preview.csv`
 - `experiments/outputs/stability_summary.csv` (written by the review notebook, not the pipeline itself)
 
@@ -111,6 +112,7 @@ At a high level:
 
 - `endmember_separability_summary.csv` stores per-run, per-stage cosine similarity statistics (`raw`, `normalized`)
 - `model_summary.csv` stores one row per run and metric, with one column per configured model
+- `model_summary_per_dominance.csv` is `model_summary.csv` split further by each held-out pixel's ground-truth mixture complexity (`dominance`: `0`=mixed, `1`=1-dominant, `2`=2-dominant), so it has 3 rows per `model_summary.csv` row
 - `abundance_preview.csv` stores the notebook-ready abundance preview table with `pixel_index`, `source`, error columns, and `endmember_*` values
 - `stability_summary.csv` stores the notebook's mean±std-across-seeds stability tables (`abundance_rmse`, `reconstruction_rmse`), one row per run/metric and one column per model
 

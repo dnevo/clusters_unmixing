@@ -12,7 +12,7 @@ import pandas as pd
 import torch
 
 from clusters_unmixing.config.schema import ExperimentConfig
-from clusters_unmixing.core_math import apply_snr_noise, compute_condition_number, compute_cosine_similarity_matrix, mix_pixels, rmse, summarize_cosine_similarity_matrix
+from clusters_unmixing.core_math import apply_snr_noise, classify_abundance_dominance, compute_condition_number, compute_cosine_similarity_matrix, mix_pixels, rmse, summarize_cosine_similarity_matrix
 from clusters_unmixing.data import generate_samples
 from clusters_unmixing.dataio import load_wavelength_and_cluster_matrix
 from clusters_unmixing.models.runner_registry import run_registered_model
@@ -230,6 +230,7 @@ def run_experiments(exp: ExperimentConfig) -> dict[str, Any]:
 
     endmember_separability_summary_rows: list[dict[str, Any]] = []
     model_summary_rows: list[dict[str, Any]] = []
+    model_summary_per_dominance_rows: list[dict[str, Any]] = []
     abundance_preview_rows: list[dict[str, Any]] = []
 
     for idx, run in enumerate(runs, start=1):
@@ -262,6 +263,10 @@ def run_experiments(exp: ExperimentConfig) -> dict[str, Any]:
             )
             _, projected_endmembers, projected_pixels = stage_projections[-1]
             test_indices = _make_held_out_test_indices(projected_pixels.shape[0])
+            # Ground-truth mixture complexity of each held-out pixel (0=mixed,
+            # 1=1-dominant, 2=2-dominant), shared by every model so
+            # model_summary_per_dominance.csv groups them the same way.
+            test_dominance = classify_abundance_dominance(true_abundances[test_indices])
 
             # Endmember-only diagnostics and the abundance/pixel preview are
             # seed-independent (cosine similarity depends only on the projected
@@ -339,6 +344,30 @@ def run_experiments(exp: ExperimentConfig) -> dict[str, Any]:
                         'mean': value,
                     })
 
+                # Same two metrics, but scored separately within each ground-truth
+                # dominance class (see test_dominance above), so
+                # model_summary_per_dominance.csv shows whether a model does worse
+                # on genuinely mixed pixels than on near-pure ones.
+                for dominance_value in (0, 1, 2):
+                    dominance_mask = test_dominance == dominance_value
+                    dominance_metrics = {
+                        'abundance_rmse': rmse(test_abundances_pred[dominance_mask], test_true_abundances[dominance_mask])
+                        if dominance_mask.any() else float('nan'),
+                        'reconstruction_rmse': rmse(reconstructed_pixels[dominance_mask], test_projected_pixels[dominance_mask])
+                        if dominance_mask.any() else float('nan'),
+                    }
+                    for metric_name, value in dominance_metrics.items():
+                        model_summary_per_dominance_rows.append({
+                            'seed': seed,
+                            'run_index': idx,
+                            'parent_run_index': parent_run_index,
+                            'run_overrides': run_overrides_label,
+                            'model': model_spec['label'],
+                            'metric': metric_name,
+                            'dominance': dominance_value,
+                            'mean': value,
+                        })
+
                 wandb_preview_rows: list[dict[str, Any]] = []
                 if seed == 0:
                     model_preview_rows = []
@@ -385,6 +414,7 @@ def run_experiments(exp: ExperimentConfig) -> dict[str, Any]:
 
     endmember_separability_summary_path = output_dir / 'endmember_separability_summary.csv'
     model_summary_path = output_dir / 'model_summary.csv'
+    model_summary_per_dominance_path = output_dir / 'model_summary_per_dominance.csv'
     abundance_preview_path = output_dir / 'abundance_preview.csv'
     pd.DataFrame(endmember_separability_summary_rows).to_csv(endmember_separability_summary_path, index=False, float_format='%.6f')
 
@@ -404,6 +434,18 @@ def run_experiments(exp: ExperimentConfig) -> dict[str, Any]:
     model_pivot.merge(run_meta, on='run_index', how='left')[
         ['seed', 'run_index', 'parent_run_index', 'run_overrides', 'metric'] + model_cols
     ].to_csv(model_summary_path, index=False, float_format='%.6f')
+
+    # Same shape as model_summary.csv, but 'dominance' (0=mixed, 1=1-dominant,
+    # 2=2-dominant) joins the pivot index, so every model_summary.csv row
+    # becomes 3 rows here - one per ground-truth mixture-complexity class.
+    model_summary_per_dominance_df = pd.DataFrame(model_summary_per_dominance_rows)
+    dominance_pivot = model_summary_per_dominance_df.pivot(
+        index=['run_index', 'seed', 'metric', 'dominance'], columns='model', values='mean'
+    ).reset_index()
+    dominance_pivot.merge(run_meta, on='run_index', how='left')[
+        ['seed', 'run_index', 'parent_run_index', 'run_overrides', 'metric', 'dominance'] + model_cols
+    ].to_csv(model_summary_per_dominance_path, index=False, float_format='%.6f')
+
     abundance_preview_df = pd.DataFrame(abundance_preview_rows).assign(
         source_order=lambda df: (df['source'] != 'true').astype(int)
     )
@@ -420,6 +462,7 @@ def run_experiments(exp: ExperimentConfig) -> dict[str, Any]:
             csv_paths={
                 'endmember_separability_summary': endmember_separability_summary_path,
                 'model_summary': model_summary_path,
+                'model_summary_per_dominance': model_summary_per_dominance_path,
                 'abundance_preview': abundance_preview_path,
             },
         )
@@ -431,6 +474,7 @@ def run_experiments(exp: ExperimentConfig) -> dict[str, Any]:
         'model_evaluation': {
             'n_runs': len(runs),
             'model_summary_path': str(model_summary_path),
+            'model_summary_per_dominance_path': str(model_summary_per_dominance_path),
             'abundance_preview_path': str(abundance_preview_path),
         },
     }

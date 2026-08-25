@@ -178,7 +178,7 @@ For each configured run in `runs`:
     held-out test pixels for every model; a handful of preview pixels are logged with
     their true and per-model estimated abundances for notebook review.
 11. **Write outputs**: `endmember_separability_summary.csv`, `model_summary.csv`,
-    `abundance_preview.csv` under `experiments/outputs/`.
+    `model_summary_per_dominance.csv`, `abundance_preview.csv` under `experiments/outputs/`.
 
 Steps 4-10 repeat once per seed in `range(num_seeds)` (top-level `num_seeds` config
 field, default `1`), reseeding every RNG (`_set_global_seeds`) before each repetition so
@@ -343,6 +343,14 @@ Each run batch writes results under `experiments/outputs/`:
   `reconstruction_rmse`), one column per configured model, computed on the shared
   held-out test pixels. The review notebook's stability tables aggregate the `seed`
   rows into `mean±std` per run/model.
+- `model_summary_per_dominance.csv` — same shape as `model_summary.csv`, but each row
+  is further split into 3 rows by `dominance`: the ground-truth mixture complexity of
+  the held-out pixels it was scored on (`0`=mixed, `1`=1-dominant: top endmember holds
+  >=60% of the abundance mass, `2`=2-dominant: top two endmembers together hold >=75%,
+  each >=25%). Lets you see whether a model's error is concentrated on genuinely mixed
+  pixels versus near-pure ones. A class with no held-out pixels in a given run/seed gets
+  `NaN` rather than a missing row, so the file always has exactly 3x
+  `model_summary.csv`'s row count.
 - `abundance_preview.csv` — a handful of preview pixels per run, with `pixel_index`,
   `source` (`true` or a model name), error columns, and `endmember_*` abundance values —
   intended for the notebook's per-pixel comparison tables/plots.
