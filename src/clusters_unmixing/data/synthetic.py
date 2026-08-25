@@ -52,15 +52,6 @@ def generate_samples(
     Dirichlet results use NumPy's RNG and are reproducible via ``np.random.seed``.
     """
     distribution = str(abundance_distribution).strip().lower()
-    if distribution not in ABUNDANCE_DISTRIBUTIONS:
-        raise ValueError(
-            f"abundance_distribution must be one of: {sorted(ABUNDANCE_DISTRIBUTIONS)}"
-        )
-    if isinstance(dirichlet_alpha, bool) or not isinstance(dirichlet_alpha, (int, float)):
-        raise ValueError("dirichlet_alpha must be a positive number")
-    if float(dirichlet_alpha) <= 0.0:
-        raise ValueError("dirichlet_alpha must be > 0")
-
     if distribution == "dirichlet":
         concentration = np.full(num_endmembers, float(dirichlet_alpha), dtype=np.float64)
         return np.random.dirichlet(concentration, size=num_samples).astype(np.float32)

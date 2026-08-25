@@ -176,5 +176,6 @@ runs:
 
     sweep_params:
       snr_db: [20.0, 30.0, .inf]   # must be ".inf", not "inf" - see note above
-      normalization: [none, quadratic]
-      nonlinearity_gamma: [0.0, 0.25]
+      #normalization: [none, quadratic]
+      dirichlet_alpha: [0.3, 0.4]
+      nonlinearity_gamma: [0.0]
