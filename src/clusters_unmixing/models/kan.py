@@ -18,7 +18,7 @@ KAN: Kolmogorov-Arnold Networks.
 
 Each edge computes a learnable univariate function (a base activation plus a
 B-spline correction) instead of a single scalar weight, per the efficient-kan
-formulation.
+formulation (https://github.com/Blealtan/efficient-kan).
 """
 
 

@@ -12,7 +12,7 @@ use_wandb: false
 # model_summary.csv carries one row per seed and the review notebook's
 # stability tables can report each model's RMSE as mean +/- std across seeds
 # instead of a single point estimate. 1 = historical single-seed behavior.
-num_seeds: 2
+num_seeds: 5
 
 cluster_sets:
 
@@ -136,7 +136,7 @@ runs:
   - cluster_set: 6clusters_thomas
 
     bands_ranges:
-      - range_µm: [0.4, 2.5]
+      - range_µm: [0.4, 2.4]
         reduce: none          # options: none | mean
 
     normalization: none   # options: none | quadratic
@@ -168,7 +168,7 @@ runs:
     models:
       - sunsal
       - vpgdu
-      - mlm
+      #- mlm
       - gbm
       - mlp
       - kan
@@ -176,5 +176,5 @@ runs:
 
     sweep_params:
       snr_db: [20.0, 30.0, .inf]   # must be ".inf", not "inf" - see note above
-      dirichlet_alpha: [0.3, 0.4]
+      dirichlet_alpha: [0.3, 0.4, 1.0]
       nonlinearity_gamma: [0.0, 0.25]
